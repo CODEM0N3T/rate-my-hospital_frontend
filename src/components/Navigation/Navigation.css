@@ -1,0 +1,31 @@
+.nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.nav__link {
+  text-decoration: none;
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.nav__link[aria-current="page"] {
+  background: var(--card);
+}
+.nav__btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.nav__btn--primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+.nav__btn:focus,
+.nav__link:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

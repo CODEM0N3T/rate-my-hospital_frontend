@@ -1,0 +1,47 @@
+.form__label {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.form__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.chip {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+.button {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.button--primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+.button--primary:hover {
+  filter: brightness(0.95);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+.container {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 16px;
+}

@@ -1,0 +1,32 @@
+.reviews {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.reviews__item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+.reviews__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.reviews__meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.reviews__rating {
+  margin-left: auto;
+}
+.reviews__body {
+  margin: 8px 0 0;
+}
+.reviews__empty {
+  color: var(--muted);
+}
