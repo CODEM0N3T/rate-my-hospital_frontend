@@ -1,8 +1,12 @@
 import "./Preloader.css";
-export default function Preloader({ label = "Loading…" }) {
+
+export default function Preloader({
+  label = "Searching for hospital…",
+  full = false,
+}) {
   return (
     <div
-      className="preloader"
+      className={`preloader ${full ? "preloader--full" : ""}`}
       role="status"
       aria-live="polite"
       aria-label={label}

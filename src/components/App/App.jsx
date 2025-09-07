@@ -21,15 +21,12 @@ export default function App() {
   const [isLoginOpen, setLoginOpen] = useState(false);
   const [isRegisterOpen, setRegisterOpen] = useState(false);
 
-  function handleRegister(payload, { recovery }) {
+  function handleRegister(payload) {
     // Persist anon record locally (no PII). We keep recovery only to SHOW once.
     upsertUser(payload);
     setCurrentUser(payload);
     setUser(payload);
     setRegisterOpen(false);
-    alert(
-      `Your alias: ${payload.alias}\nYour recovery code: ${recovery}\n\nSave this code. We cannot restore it for you.`
-    );
   }
 
   function handleLogin(record) {
@@ -69,12 +66,16 @@ export default function App() {
           onClose={() => setLoginOpen(false)}
         />
       )}
-      {isRegisterOpen && (
-        <RegisterModal
-          onSubmit={handleRegister}
-          onClose={() => setRegisterOpen(false)}
-        />
-      )}
+     {isRegisterOpen && (
+  <RegisterModal
+    onSubmit={handleRegister}
+    onClose={() => setRegisterOpen(false)}
+    onGoToLogin={() => {            // ← close Register, open Login
+      setRegisterOpen(false);
+      setLoginOpen(true);
+    }}
+  />
+)}
     </div>
   );
 }

@@ -1,9 +1,22 @@
 .preloader {
   display: flex;
-  gap: 10px;
   align-items: center;
-  padding: 12px 0;
+  justify-content: center; /* center horizontally */
+  gap: 10px;
+  padding: 16px 0;
+  width: 100%;
 }
+
+/* Optional: full-screen centered loader */
+.preloader--full {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center; /* center both axes */
+  background: transparent; /* change to rgba(255,255,255,.6) for a light veil */
+  z-index: 50;
+}
+
 .preloader__spinner {
   width: 18px;
   height: 18px;
@@ -12,10 +25,12 @@
   border-top-color: #111;
   animation: spin 0.7s linear infinite;
 }
+
 .preloader__text {
   color: var(--muted);
   font-size: 14px;
 }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

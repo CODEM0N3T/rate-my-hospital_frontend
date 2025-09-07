@@ -1,6 +1,6 @@
 .hero {
   position: relative;
-  min-height: 52vh; /* slightly shorter */
+  min-height: 45vh; /* slightly shorter */
   background-image: var(--hero-bg);
   background-size: cover;
   background-position: center;

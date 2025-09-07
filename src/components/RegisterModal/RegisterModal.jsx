@@ -1,41 +1,52 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ModalWithForm from "../ModalWithForm/ModalWithForm.jsx";
-import { makeAlias, makeRecoveryCode } from "../../utils/anon.js";
 import { sha256Hex } from "../../utils/crypto.js";
+import { aliasExists } from "../../storage/users.js";
 
-export default function RegisterModal({ onSubmit, onClose }) {
+export default function RegisterModal({ onSubmit, onClose, onGoToLogin }) {
   const [role, setRole] = useState("nurse");
   const [facility, setFacility] = useState("");
-  const [alias, setAlias] = useState(makeAlias("nurse"));
-  const [recovery, setRecovery] = useState(makeRecoveryCode());
-  const [showSavedHint, setShowSavedHint] = useState(false);
-
-  useEffect(() => {
-    setAlias(makeAlias(role));
-  }, [role]);
+  const [alias, setAlias] = useState("");
+  const [pass, setPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const codeHash = await sha256Hex(recovery);
+    setError("");
+
+    const name = alias.trim();
+    if (name.length < 3) return setError("Name must be at least 3 characters.");
+    if (aliasExists(name))
+      return setError("That name is already in use on this device.");
+    if (pass.length < 8)
+      return setError("Passcode must be at least 8 characters.");
+    if (pass !== confirm) return setError("Passcodes do not match.");
+
+    const codeHash = await sha256Hex(pass);
     const payload = {
       id: crypto?.randomUUID?.() || String(Date.now()),
-      alias,
+      alias: name,
       role,
       facility: facility.trim() || null,
-      codeHash, // store only the hash (no PII)
+      codeHash, // store only the hash (no raw passcode)
       createdAt: new Date().toISOString(),
     };
-    onSubmit(payload, { recovery }); // pass plain code ONLY to show to the user once
+    onSubmit(payload);
   }
 
   return (
     <ModalWithForm
-      title="Create anonymous account"
+      title="Create your account"
       onClose={onClose}
       onSubmit={handleSubmit}
       submitLabel="Create account"
+      secondaryLabel="Login" // ← text change
+      onSecondary={onGoToLogin}
     >
-      <fieldset className="form__row">
+      <fieldset className="form__row field">
         <legend className="form__label">Role</legend>
         <label className="chip">
           <input
@@ -59,62 +70,80 @@ export default function RegisterModal({ onSubmit, onClose }) {
         </label>
       </fieldset>
 
-      <label>
+      <label className="field">
+        <span className="form__label">Display name</span>
+        <input
+          className="input"
+          value={alias}
+          onChange={(e) => setAlias(e.target.value)}
+          placeholder="Choose a name (e.g., Nurse Willow)"
+          required
+          minLength={3}
+          maxLength={24}
+        />
+      </label>
+
+      <label className="field">
         <span className="form__label">Facility (optional)</span>
         <input
           className="input"
           value={facility}
           onChange={(e) => setFacility(e.target.value)}
-          placeholder="Hospital name"
+          placeholder="Your hospital"
         />
       </label>
 
-      <label>
-        <span className="form__label">Your alias</span>
-        <div className="form__row">
-          <input className="input" readOnly value={alias} />
-          <button
-            type="button"
-            className="button"
-            onClick={() => setAlias(makeAlias(role))}
-          >
-            Regenerate
-          </button>
-        </div>
+      <label className="field password-field">
+        <span className="form__label">Passcode</span>
+        <input
+          className="input"
+          type={showPass ? "text" : "password"}
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          placeholder="Create a passcode (min 8 chars)"
+          required
+          minLength={8}
+        />
+        <button
+          type="button"
+          className="password-toggle"
+          onClick={() => setShowPass((v) => !v)}
+          aria-label={showPass ? "Hide passcode" : "Show passcode"}
+        >
+          {showPass ? "Hide" : "Show"}
+        </button>
       </label>
 
-      <label>
-        <span className="form__label">Recovery code (save this!)</span>
-        <div className="form__row">
-          <input className="input" readOnly value={recovery} />
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              navigator.clipboard.writeText(recovery);
-              setShowSavedHint(true);
-            }}
-          >
-            Copy
-          </button>
-          <button
-            type="button"
-            className="button"
-            onClick={() => setRecovery(makeRecoveryCode())}
-          >
-            New
-          </button>
-        </div>
-        {showSavedHint && (
-          <small className="text-muted">
-            Copied. Store it somewhere safe. We don’t keep this.
-          </small>
-        )}
+      <label className="field password-field">
+        <span className="form__label">Confirm passcode</span>
+        <input
+          className="input"
+          type={showConfirm ? "text" : "password"}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          placeholder="Re-enter your passcode"
+          required
+          minLength={8}
+        />
+        <button
+          type="button"
+          className="password-toggle"
+          onClick={() => setShowConfirm((v) => !v)}
+          aria-label={showConfirm ? "Hide passcode" : "Show passcode"}
+        >
+          {showConfirm ? "Hide" : "Show"}
+        </button>
       </label>
 
-      <p className="text-muted" style={{ marginTop: 8 }}>
-        We don’t ask for your name or email. Your identity is a random alias.
-        Keep your recovery code to sign in later.
+      {error && (
+        <p role="alert" style={{ color: "#b91c1c" }}>
+          {error}
+        </p>
+      )}
+
+      <p className="text-muted" style={{ marginTop: 6 }}>
+        No email required. Your display name is public. Your passcode is private
+        and never stored in plain text.
       </p>
     </ModalWithForm>
   );

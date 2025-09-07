@@ -4,7 +4,8 @@
   --muted: #6b7280;
   --card: #f9fafb;
   --border: #e5e7eb;
-  --brand: #0ea5e9;
+  --brand: #2563eb; /* same as your submit button */
+  --btn-radius: 9999px;
   --focus: #111827;
   --radius: 14px;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.06);

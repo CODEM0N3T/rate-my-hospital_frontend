@@ -1,18 +1,22 @@
+import { Link } from "react-router-dom";
 import Navigation from "../Navigation/Navigation.jsx";
-import logo from "../../assets/images/rmh-logo.png"; // ← NEW
+import logo from "../../assets/images/rmh-logo.png";
 import "./Header.css";
 
 export default function Header({ loggedIn, onSignIn, onSignUp, onSignOut }) {
   return (
     <header className="header">
-      {/* <a className="skip-link" href="#main-content">
-        Skip to content
-      </a> */}
       <div className="header__inner container">
-        <div className="header__brand">
-          <img className="header__logo" src={logo} alt="" />
+        {/* Clickable logo + title */}
+        <Link
+          to="/"
+          className="header__brand"
+          aria-label="Rate My Hospital — Home"
+        >
+          <img className="header__logo" src={logo} alt="" aria-hidden="true" />
           <span className="header__brand-text">Rate My Hospital</span>
-        </div>
+        </Link>
+
         <Navigation
           loggedIn={loggedIn}
           onSignIn={onSignIn}

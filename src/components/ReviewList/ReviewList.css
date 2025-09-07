@@ -1,9 +1,10 @@
 .reviews {
   list-style: none;
-  margin: 0;
+  margin: 20px 0 0 0;
   padding: 0;
   display: grid;
   gap: 12px;
+  text-align: left;
 }
 .reviews__item {
   border: 1px solid var(--border);
@@ -25,7 +26,7 @@
   margin-left: auto;
 }
 .reviews__body {
-  margin: 8px 0 0;
+  margin: 8px 0 0 20px;
 }
 .reviews__empty {
   color: var(--muted);

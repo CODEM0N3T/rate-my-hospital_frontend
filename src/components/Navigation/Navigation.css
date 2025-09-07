@@ -20,9 +20,9 @@
   cursor: pointer;
 }
 .nav__btn--primary {
-  background: #111;
+  background: #2563eb;
   color: #fff;
-  border-color: #111;
+  border-color: #2563eb;
 }
 .nav__btn:focus,
 .nav__link:focus {

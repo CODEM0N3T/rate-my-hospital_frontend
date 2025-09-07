@@ -31,10 +31,11 @@ export default function HospitalCard({
   return (
     <article className="hospital-card">
       <Link
-        to={`/hospital/${providerId}`}
-        className="hospital-card__link"
-        aria-label={`Open ${hospitalName}`}
-      >
+  to={`/hospital/${providerId}`}
+  state={{ hospital: { providerId, hospitalName, city, state, phone, type, ownership } }}
+  className="hospital-card__link"
+  aria-label={`Open ${hospitalName}`}
+>
         <div className="hospital-card__media">
           <img src={img} alt="" loading="lazy" />
         </div>

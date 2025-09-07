@@ -16,13 +16,39 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
 }
 .header__logo {
-  height: 28px;
-  width: 28px;
+  height: 35px;
+  width: 35px;
   object-fit: contain;
 }
 .header__brand-text {
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+/* Hover/active feedback */
+.header__brand:hover .header__brand-text {
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+.header__brand:active {
+  opacity: 0.9;
+}
+
+/* Keyboard focus ring for accessibility */
+.header__brand:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Prevent visited link color changes */
+.header__brand:visited {
+  color: inherit;
 }
