@@ -1,254 +1,93 @@
-// netlify/functions/cms-proxy.js
+// src/api/cms.js
+import {
+  CMS_PROXY_BASE,
+  DATASETS,
+  PAGE_LIMIT,
+  USE_MOCKS,
+} from "../constants/CONFIG.js";
+import { MOCK_HOSPITALS } from "../mocks/hospitals.js";
+import { MOCK_HCAHPS } from "../mocks/hcahps.js";
 
-let _fetch = globalThis.fetch;
-async function getFetch() {
-  if (_fetch) return _fetch;
-  const mod = await import("node-fetch");
-  _fetch = mod.default;
-  return _fetch;
-}
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Cache-Control": "public, max-age=60",
-  "Content-Type": "application/json",
+// -------- helpers --------
+const check = async (res) => {
+  const text = await res.text().catch(() => "");
+  if (!res.ok)
+    throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 };
 
-// ~3.5s per upstream call
-const PER_UPSTREAM_TIMEOUT = Number(
-  process.env.CMS_UPSTREAM_TIMEOUT_MS || 3500
-);
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// New Provider Data API (dataset GUIDs, but we'll try the Socrata 4x4 too)
-// NOTE: Some datasets require a GUID, not the 4x4. If the 4x4 fails, this may 404/timeout.
-const PROVIDER_CANDIDATES = [
-  (dataset, qs) =>
-    `https://data.cms.gov/provider-data/api/v1/dataset/${encodeURIComponent(
-      dataset
-    )}/data?${qs}`,
-  (dataset, qs) =>
-    `https://data.cms.gov/data-api/v1/dataset/${encodeURIComponent(
-      dataset
-    )}/data?${qs}`,
-];
+function proxyUrl(dataset, params = {}) {
+  const base = (CMS_PROXY_BASE || "").replace(/\/+$/, "");
+  if (!base) throw new Error("CMS_PROXY_BASE missing");
+  const url = new URL(base); // e.g. https://YOUR-SITE.netlify.app/.netlify/functions/cms-proxy
+  url.searchParams.set("dataset", dataset);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
+  });
+  return url.toString();
+}
 
-// Socrata (legacy medicare domain)
-const MEDICARE_SODATA = (dataset, qs) =>
-  `https://data.medicare.gov/resource/${encodeURIComponent(
-    dataset
-  )}.json?${qs}`;
+// -------- mocks --------
+function match(txt = "", q = "") {
+  return String(txt).toLowerCase().includes(String(q).toLowerCase());
+}
+async function mockFetchHospitals({ q = "", state = "", page = 1 } = {}) {
+  await delay(200);
+  const rows = MOCK_HOSPITALS.filter((h) => {
+    const passQ = !q || match(h.hospital_name, q) || match(h.city, q);
+    const passS = !state || String(h.state) === String(state);
+    return passQ && passS;
+  });
+  const start = (page - 1) * PAGE_LIMIT;
+  return rows.slice(start, start + PAGE_LIMIT);
+}
+async function mockFetchHcahps(providerId) {
+  await delay(150);
+  return MOCK_HCAHPS[providerId] || [];
+}
 
-// Small built-in sample so your UI never breaks during outages
-const SAMPLE_ROWS = [
-  {
-    provider_id: "10001",
-    hospital_name: "Sample General Hospital",
-    city: "Springfield",
-    state: "IL",
-    phone_number: "(217) 555-0100",
-    hospital_type: "Acute Care Hospitals",
-    hospital_ownership: "Government - Hospital District or Authority",
-    hospital_overall_rating: "4",
-  },
-  {
-    provider_id: "10002",
-    hospital_name: "River Valley Medical Center",
-    city: "Columbus",
-    state: "OH",
-    phone_number: "(614) 555-0102",
-    hospital_type: "Acute Care Hospitals",
-    hospital_ownership: "Proprietary",
-    hospital_overall_rating: "3",
-  },
-  {
-    provider_id: "10003",
-    hospital_name: "Coastal Health Clinic",
-    city: "Savannah",
-    state: "GA",
-    phone_number: "(912) 555-0103",
-    hospital_type: "Critical Access Hospitals",
-    hospital_ownership: "Voluntary non-profit - Private",
-    hospital_overall_rating: "5",
-  },
-];
+// -------- PUBLIC API (named exports!) --------
+export function fetchHospitals(params = {}, fetchOpts = {}) {
+  if (USE_MOCKS) return mockFetchHospitals(params);
 
-function pickFields(row = {}) {
-  return {
-    provider_id: row.provider_id || row.ccn || row.providerid || null,
-    hospital_name:
-      row.hospital_name ||
-      row.hospitalname ||
-      row.facility_name ||
-      row.name ||
-      null,
-    city: row.city || null,
-    state: row.state || null,
-    phone_number: row.phone_number || row.phone || null,
-    hospital_type: row.hospital_type || row.type || null,
-    hospital_ownership: row.hospital_ownership || row.ownership || null,
-    hospital_overall_rating:
-      row.hospital_overall_rating ||
-      row.overall_rating ||
-      row.hcahps_star_rating ||
-      null,
+  const { q = "", state = "", page = 1 } = params;
+  const query = {
+    size: String(PAGE_LIMIT),
+    offset: String((page - 1) * PAGE_LIMIT),
   };
-}
-const contains = (h = "", n = "") =>
-  String(h || "")
-    .toLowerCase()
-    .includes(String(n || "").toLowerCase());
+  if (q) query.q = q;
+  if (state) query.state = state;
 
-function applyFilters(rows, { q, state }) {
-  let out = rows || [];
-  if (q)
-    out = out.filter(
-      (r) => contains(r.hospital_name, q) || contains(r.city, q)
-    );
-  if (state)
-    out = out.filter(
-      (r) => String(r.state || "").toUpperCase() === String(state).toUpperCase()
-    );
-  return out;
+  const url = proxyUrl(DATASETS.HOSPITALS, query);
+  return fetch(url, fetchOpts)
+    .then(check)
+    .catch((err) => {
+      console.warn("[CMS] proxy failed, using mocks:", err.message || err);
+      return mockFetchHospitals(params);
+    });
 }
 
-async function fetchWithTimeout(url, opts = {}, ms = PER_UPSTREAM_TIMEOUT) {
-  const fetch = await getFetch();
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(new Error("timeout")), ms);
-  try {
-    return await fetch(url, { ...opts, signal: ctrl.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
+export function fetchHcahps(providerId, fetchOpts = {}) {
+  if (!providerId) return Promise.resolve([]);
+  if (USE_MOCKS) return mockFetchHcahps(providerId);
 
-exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: CORS, body: "" };
-  }
-
-  try {
-    const url = new URL(
-      event.rawUrl ||
-        `https://example.com${event.path}${
-          event.rawQuery ? "?" + event.rawQuery : ""
-        }`
-    );
-    const qs = url.searchParams;
-
-    const dataset = qs.get("dataset");
-    if (!dataset) {
-      return {
-        statusCode: 400,
-        headers: CORS,
-        body: JSON.stringify({ error: "Missing dataset" }),
-      };
-    }
-
-    // Optional: force a specific upstream via ?mode=socrata
-    const mode = (qs.get("mode") || "").toLowerCase();
-
-    // Normalize inputs
-    const size = qs.get("size") || qs.get("$limit") || "24";
-    const offset = qs.get("offset") || qs.get("$offset") || "0";
-    const q = qs.get("q") || qs.get("$q") || "";
-    const state = qs.get("state") || "";
-
-    // Build query strings
-    const providerQS = new URLSearchParams();
-    providerQS.set("size", String(size));
-    providerQS.set("offset", String(offset));
-    if (q) providerQS.set("keyword", q);
-
-    const sodataQS = new URLSearchParams();
-    sodataQS.set("$limit", String(size));
-    sodataQS.set("$offset", String(offset));
-    if (q) sodataQS.set("$q", q);
-
-    const upstreams =
-      mode === "socrata"
-        ? [MEDICARE_SODATA(dataset, sodataQS.toString())]
-        : [
-            ...PROVIDER_CANDIDATES.map((f) =>
-              f(dataset, providerQS.toString())
-            ),
-            MEDICARE_SODATA(dataset, sodataQS.toString()),
-          ];
-
-    let rows = null;
-    let lastErr = null;
-
-    for (const upstreamURL of upstreams) {
-      try {
-        const headers = { Accept: "application/json" };
-        if (
-          upstreamURL.includes("data.medicare.gov") &&
-          process.env.CMS_APP_TOKEN
-        ) {
-          headers["X-App-Token"] = process.env.CMS_APP_TOKEN;
-        }
-
-        const res = await fetchWithTimeout(upstreamURL, {
-          headers,
-          redirect: "follow",
-        });
-        const text = await res.text();
-
-        if (!res.ok) {
-          lastErr = new Error(
-            `${res.status} ${res.statusText}: ${text.slice(0, 300)}`
-          );
-          console.error(
-            "[cms-proxy] upstream error:",
-            upstreamURL,
-            lastErr.message
-          );
-          continue;
-        }
-
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch {
-          lastErr = new Error(`Invalid JSON from ${upstreamURL}`);
-          console.error("[cms-proxy] parse error:", upstreamURL);
-          continue;
-        }
-
-        rows = (Array.isArray(json) ? json : json.items || []).map(pickFields);
-        break; // success
-      } catch (e) {
-        lastErr = e;
-        console.error(
-          "[cms-proxy] fetch failed:",
-          e?.message || e,
-          "url:",
-          upstreamURL
-        );
-        continue;
-      }
-    }
-
-    // Final fallback: ship a small sample so your UI always renders
-    if (!rows) {
+  const url = proxyUrl(DATASETS.HCAHPS, {
+    provider_id: providerId,
+    size: "50",
+  });
+  return fetch(url, fetchOpts)
+    .then(check)
+    .catch((err) => {
       console.warn(
-        "[cms-proxy] returning SAMPLE_ROWS due to:",
-        lastErr?.message || lastErr
+        "[CMS] proxy failed (HCAHPS), using mocks:",
+        err.message || err
       );
-      const filtered = applyFilters(SAMPLE_ROWS, { q, state });
-      return { statusCode: 200, headers: CORS, body: JSON.stringify(filtered) };
-    }
-
-    const filtered = applyFilters(rows, { q, state });
-    return { statusCode: 200, headers: CORS, body: JSON.stringify(filtered) };
-  } catch (err) {
-    console.error("[cms-proxy] handler error:", err);
-    return {
-      statusCode: 200, // still return 200 with sample so frontend stays happy
-      headers: CORS,
-      body: JSON.stringify(SAMPLE_ROWS),
-    };
-  }
-};
+      return mockFetchHcahps(providerId);
+    });
+}

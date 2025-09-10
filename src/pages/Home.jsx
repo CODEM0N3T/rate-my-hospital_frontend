@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchHospitals } from "../api/cms";
+import { fetchHospitals } from "../api/cms.js";
 import SearchBar from "../components/SearchBar/SearchBar.jsx";
 import Preloader from "../components/Preloader/Preloader.jsx";
 import HospitalList from "../components/HospitalList/HospitalList.jsx";
