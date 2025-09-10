@@ -1,187 +1,98 @@
-// netlify/functions/cms-proxy.js
+// netlify/functions/cms-proxy.mjs
+export const config = { path: "/.netlify/functions/cms-proxy" };
 
-let _fetch = globalThis.fetch;
-async function getFetch() {
-  if (_fetch) return _fetch;
-  const mod = await import("node-fetch"); // ensure node-fetch is in dependencies
-  _fetch = mod.default;
-  return _fetch;
-}
-
-const CORS = {
+const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Cache-Control": "public, max-age=60",
-  "Content-Type": "application/json",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const PROVIDER_CANDIDATES = [
-  (dataset, qs) =>
-    `https://data.cms.gov/provider-data/api/v1/dataset/${encodeURIComponent(
-      dataset
-    )}/data?${qs}`,
-  (dataset, qs) =>
-    `https://data.cms.gov/data-api/v1/dataset/${encodeURIComponent(
-      dataset
-    )}/data?${qs}`,
-];
-const MEDICARE_SODATA = (dataset, qs) =>
-  `https://data.medicare.gov/resource/${encodeURIComponent(
-    dataset
-  )}.json?${qs}`;
+const HOSPITALS_ALIAS = "xubh-q36u"; // Hospital General Info (Socrata alias)
+const HCAHPS_ALIAS = "dgck-syfz"; // HCAHPS (Socrata alias)
 
-function pickFields(row = {}) {
-  return {
-    provider_id: row.provider_id || row.ccn || row.providerid || null,
-    hospital_name:
-      row.hospital_name ||
-      row.hospitalname ||
-      row.facility_name ||
-      row.name ||
-      null,
-    city: row.city || null,
-    state: row.state || null,
-    phone_number: row.phone_number || row.phone || null,
-    hospital_type: row.hospital_type || row.type || null,
-    hospital_ownership: row.hospital_ownership || row.ownership || null,
-    hospital_overall_rating:
-      row.hospital_overall_rating ||
-      row.overall_rating ||
-      row.hcahps_star_rating ||
-      null,
-  };
-}
-const contains = (h = "", n = "") =>
-  String(h || "")
-    .toLowerCase()
-    .includes(String(n || "").toLowerCase());
+// Helper: map query from UI to Socrata-ish or Provider API
+function buildUpstreamUrl(dataset, qs) {
+  // Try Provider Data API first (more modern). NOTE: some sites require UUID not alias.
+  // If this 404s in your logs, flip to Socrata "resource" path below (and add your app token there).
+  const params = new URLSearchParams();
+  // map your UI params -> provider API params
+  if (qs.get("size")) params.set("size", qs.get("size"));
+  if (qs.get("offset")) params.set("offset", qs.get("offset"));
+  if (qs.get("q")) params.set("q", qs.get("q"));
+  if (qs.get("state")) params.set("state", qs.get("state"));
+  if (dataset === HCAHPS_ALIAS && qs.get("provider_id")) {
+    params.set("provider_id", qs.get("provider_id"));
+  }
 
-function applyFilters(rows, { q, state }) {
-  let out = rows || [];
-  if (q)
-    out = out.filter(
-      (r) => contains(r.hospital_name, q) || contains(r.city, q)
-    );
-  if (state)
-    out = out.filter(
-      (r) => String(r.state || "").toUpperCase() === String(state).toUpperCase()
-    );
-  return out;
+  // Provider Data API (CORS-friendly from server)
+  // If this path fails for you, uncomment the Socrata fallback below instead.
+  return `https://data.cms.gov/provider-data/api/1/datastore/sql?${params.toString()}`;
+
+  // ---- Socrata fallback (legacy; often blocked client-side, ok from server) ----
+  // const soc = new URL(`https://data.cms.gov/resource/${dataset}.json`);
+  // if (qs.get("size"))   soc.searchParams.set("$limit",  qs.get("size"));
+  // if (qs.get("offset")) soc.searchParams.set("$offset", qs.get("offset"));
+  // if (qs.get("q"))      soc.searchParams.set("$q",      qs.get("q"));
+  // if (qs.get("state"))  soc.searchParams.set("state",   qs.get("state"));
+  // if (dataset === HCAHPS_ALIAS && qs.get("provider_id")) {
+  //   soc.searchParams.set("provider_id", qs.get("provider_id"));
+  // }
+  // return soc.toString();
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: CORS, body: "" };
+export default async (req, context) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
   try {
-    // Log basics so you can see it in Netlify → Functions → Logs
-    console.log("[cms-proxy] node:", process.version, "url:", event.rawUrl);
-
-    // Parse query from rawUrl (safer for all Netlify contexts)
-    const url = new URL(
-      event.rawUrl ||
-        `https://example.com${event.path}${
-          event.rawQuery ? "?" + event.rawQuery : ""
-        }`
-    );
+    const url = new URL(req.url);
     const qs = url.searchParams;
-
     const dataset = qs.get("dataset");
+
     if (!dataset) {
-      return {
-        statusCode: 400,
-        headers: CORS,
-        body: JSON.stringify({ error: "Missing dataset" }),
-      };
+      return new Response(JSON.stringify({ error: "Missing dataset param" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
     }
 
-    const size = qs.get("size") || qs.get("$limit") || "24";
-    const offset = qs.get("offset") || qs.get("$offset") || "0";
-    const q = qs.get("q") || qs.get("$q") || "";
-    const state = qs.get("state") || "";
+    const upstream = buildUpstreamUrl(dataset, qs);
 
-    const providerQS = new URLSearchParams();
-    providerQS.set("size", String(size));
-    providerQS.set("offset", String(offset));
-    if (q) providerQS.set("keyword", q);
+    // If you have a CMS App Token and use Socrata fallback, add headers here:
+    // const headers = { "X-App-Token": process.env.CMS_APP_TOKEN || "" };
 
-    const sodataQS = new URLSearchParams();
-    sodataQS.set("$limit", String(size));
-    sodataQS.set("$offset", String(offset));
-    if (q) sodataQS.set("$q", q);
+    const res = await fetch(upstream /*, { headers } */);
+    const text = await res.text();
 
-    const upstreams = [
-      ...PROVIDER_CANDIDATES.map((f) => f(dataset, providerQS.toString())),
-      MEDICARE_SODATA(dataset, sodataQS.toString()),
-    ];
-
-    const fetch = await getFetch();
-    let lastErr = null;
-    let rows = null;
-
-    for (const u of upstreams) {
-      try {
-        const headers = { Accept: "application/json" };
-        if (u.includes("data.medicare.gov") && process.env.CMS_APP_TOKEN) {
-          headers["X-App-Token"] = process.env.CMS_APP_TOKEN;
-        }
-        const res = await fetch(u, { headers, redirect: "follow" });
-        const text = await res.text();
-
-        if (!res.ok) {
-          lastErr = new Error(
-            `${res.status} ${res.statusText}: ${text.slice(0, 300)}`
-          );
-          console.error("[cms-proxy] upstream error:", u, lastErr.message);
-          continue;
-        }
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch {
-          lastErr = new Error(`Invalid JSON from ${u}`);
-          console.error("[cms-proxy] parse error:", u);
-          continue;
-        }
-
-        rows = (Array.isArray(json) ? json : json.items || []).map(pickFields);
-        break;
-      } catch (e) {
-        lastErr = e;
-        console.error("[cms-proxy] fetch failed:", e?.message || e, "url:", u);
-        continue;
-      }
-    }
-
-    if (!rows) {
-      return {
-        statusCode: 502,
-        headers: CORS, // CORS even on error
-        body: JSON.stringify({
+    if (!res.ok) {
+      return new Response(
+        JSON.stringify({
           error: "Upstream fetch failed",
-          detail: String(lastErr || "unknown"),
+          status: res.status,
+          body: text.slice(0, 500),
         }),
-      };
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
-    const filtered = applyFilters(rows, { q, state });
-
-    return {
-      statusCode: 200,
-      headers: CORS, // CORS on success
-      body: JSON.stringify(filtered),
-    };
+    return new Response(text, {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
   } catch (err) {
-    console.error("[cms-proxy] handler error:", err);
-    return {
-      statusCode: 500,
-      headers: CORS,
-      body: JSON.stringify({
+    return new Response(
+      JSON.stringify({
         error: "Function error",
         detail: String(err?.message || err),
       }),
-    };
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      }
+    );
   }
 };
