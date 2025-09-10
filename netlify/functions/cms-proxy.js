@@ -1,10 +1,9 @@
 // netlify/functions/cms-proxy.js
 
-// Ensure fetch exists (Node 18 has it; fallback to node-fetch for safety)
 let _fetch = globalThis.fetch;
 async function getFetch() {
   if (_fetch) return _fetch;
-  const mod = await import("node-fetch");
+  const mod = await import("node-fetch"); // ensure node-fetch is in dependencies
   _fetch = mod.default;
   return _fetch;
 }
@@ -72,13 +71,15 @@ function applyFilters(rows, { q, state }) {
 }
 
 exports.handler = async (event) => {
-  // Always handle preflight with CORS headers
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: CORS, body: "" };
   }
 
   try {
-    // Parse query safely from the full URL
+    // Log basics so you can see it in Netlify → Functions → Logs
+    console.log("[cms-proxy] node:", process.version, "url:", event.rawUrl);
+
+    // Parse query from rawUrl (safer for all Netlify contexts)
     const url = new URL(
       event.rawUrl ||
         `https://example.com${event.path}${
@@ -101,7 +102,6 @@ exports.handler = async (event) => {
     const q = qs.get("q") || qs.get("$q") || "";
     const state = qs.get("state") || "";
 
-    // Build query strings
     const providerQS = new URLSearchParams();
     providerQS.set("size", String(size));
     providerQS.set("offset", String(offset));
@@ -129,6 +129,7 @@ exports.handler = async (event) => {
         }
         const res = await fetch(u, { headers, redirect: "follow" });
         const text = await res.text();
+
         if (!res.ok) {
           lastErr = new Error(
             `${res.status} ${res.statusText}: ${text.slice(0, 300)}`
@@ -144,6 +145,7 @@ exports.handler = async (event) => {
           console.error("[cms-proxy] parse error:", u);
           continue;
         }
+
         rows = (Array.isArray(json) ? json : json.items || []).map(pickFields);
         break;
       } catch (e) {
@@ -168,12 +170,11 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: CORS, // ✅ CORS on success
+      headers: CORS, // CORS on success
       body: JSON.stringify(filtered),
     };
   } catch (err) {
     console.error("[cms-proxy] handler error:", err);
-    // ✅ CORS even on unexpected crashes
     return {
       statusCode: 500,
       headers: CORS,
