@@ -1,6 +1,7 @@
 import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { fetchHcahps } from "../api/cms";
+import { fetchHcahps } from "../api/cms.js";
+
 import { loadReviews, saveReview } from "../storage/reviews";
 import ReviewList from "../components/ReviewList/ReviewList.jsx";
 import ReviewForm from "../components/ReviewForm/ReviewForm.jsx";
@@ -45,7 +46,10 @@ export default function HospitalDetail() {
     setReviews(loadReviews(providerId));
     fetchHcahps(providerId)
       .then(setMetrics)
-      .catch(() => setMetrics([]));
+      .catch((e) => {
+        console.warn("[HCAHPS] falling back:", e);
+        setMetrics([]); // already your fallback
+      });
   }, [providerId]);
 
   function addReview(r) {
