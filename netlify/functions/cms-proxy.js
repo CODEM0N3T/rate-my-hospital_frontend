@@ -1,16 +1,23 @@
 // netlify/functions/cms-proxy.js
 
-// Use native fetch if available (Node 18+). Fallback to node-fetch.
+// Ensure fetch exists (Node 18 has it; fallback to node-fetch for safety)
 let _fetch = globalThis.fetch;
-async function ensureFetch() {
+async function getFetch() {
   if (_fetch) return _fetch;
   const mod = await import("node-fetch");
   _fetch = mod.default;
   return _fetch;
 }
 
-const CMS_PROVIDER_CANDIDATES = [
-  // New Provider Data API endpoints
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization",
+  "Cache-Control": "public, max-age=60",
+  "Content-Type": "application/json",
+};
+
+const PROVIDER_CANDIDATES = [
   (dataset, qs) =>
     `https://data.cms.gov/provider-data/api/v1/dataset/${encodeURIComponent(
       dataset
@@ -20,20 +27,10 @@ const CMS_PROVIDER_CANDIDATES = [
       dataset
     )}/data?${qs}`,
 ];
-
-// Socrata fallback (Medicare)
 const MEDICARE_SODATA = (dataset, qs) =>
   `https://data.medicare.gov/resource/${encodeURIComponent(
     dataset
   )}.json?${qs}`;
-
-// CORS
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Cache-Control": "public, max-age=60",
-};
 
 function pickFields(row = {}) {
   return {
@@ -56,12 +53,10 @@ function pickFields(row = {}) {
       null,
   };
 }
-
-function contains(h = "", n = "") {
-  return String(h || "")
+const contains = (h = "", n = "") =>
+  String(h || "")
     .toLowerCase()
     .includes(String(n || "").toLowerCase());
-}
 
 function applyFilters(rows, { q, state }) {
   let out = rows || [];
@@ -77,80 +72,83 @@ function applyFilters(rows, { q, state }) {
 }
 
 exports.handler = async (event) => {
+  // Always handle preflight with CORS headers
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: CORS, body: "" };
   }
 
   try {
-    const qsIn = new URLSearchParams(event.rawQuery || "");
-    const dataset = qsIn.get("dataset");
+    // Parse query safely from the full URL
+    const url = new URL(
+      event.rawUrl ||
+        `https://example.com${event.path}${
+          event.rawQuery ? "?" + event.rawQuery : ""
+        }`
+    );
+    const qs = url.searchParams;
+
+    const dataset = qs.get("dataset");
     if (!dataset) {
-      return { statusCode: 400, headers: CORS, body: "Missing dataset" };
+      return {
+        statusCode: 400,
+        headers: CORS,
+        body: JSON.stringify({ error: "Missing dataset" }),
+      };
     }
 
-    // Normalize params
-    const size = qsIn.get("size") || qsIn.get("$limit") || "24";
-    const offset = qsIn.get("offset") || qsIn.get("$offset") || "0";
-    const q = qsIn.get("q") || qsIn.get("$q") || "";
-    const state = qsIn.get("state") || "";
+    const size = qs.get("size") || qs.get("$limit") || "24";
+    const offset = qs.get("offset") || qs.get("$offset") || "0";
+    const q = qs.get("q") || qs.get("$q") || "";
+    const state = qs.get("state") || "";
 
-    // Provider Data API params
+    // Build query strings
     const providerQS = new URLSearchParams();
     providerQS.set("size", String(size));
     providerQS.set("offset", String(offset));
-    if (q) providerQS.set("keyword", q); // some endpoints support "keyword"
+    if (q) providerQS.set("keyword", q);
 
-    // Socrata params
     const sodataQS = new URLSearchParams();
     sodataQS.set("$limit", String(size));
     sodataQS.set("$offset", String(offset));
     if (q) sodataQS.set("$q", q);
 
     const upstreams = [
-      ...CMS_PROVIDER_CANDIDATES.map((f) => f(dataset, providerQS.toString())),
+      ...PROVIDER_CANDIDATES.map((f) => f(dataset, providerQS.toString())),
       MEDICARE_SODATA(dataset, sodataQS.toString()),
     ];
 
-    const fetch = await ensureFetch();
+    const fetch = await getFetch();
     let lastErr = null;
     let rows = null;
 
-    for (const url of upstreams) {
+    for (const u of upstreams) {
       try {
         const headers = { Accept: "application/json" };
-        if (url.includes("data.medicare.gov") && process.env.CMS_APP_TOKEN) {
+        if (u.includes("data.medicare.gov") && process.env.CMS_APP_TOKEN) {
           headers["X-App-Token"] = process.env.CMS_APP_TOKEN;
         }
-
-        const res = await fetch(url, { headers, redirect: "follow" });
+        const res = await fetch(u, { headers, redirect: "follow" });
         const text = await res.text();
-
         if (!res.ok) {
           lastErr = new Error(
             `${res.status} ${res.statusText}: ${text.slice(0, 300)}`
           );
-          console.error("[cms-proxy] Upstream error", url, String(lastErr));
+          console.error("[cms-proxy] upstream error:", u, lastErr.message);
           continue;
         }
-
         let json;
         try {
           json = JSON.parse(text);
-        } catch (e) {
-          lastErr = new Error(`Invalid JSON from ${url}`);
-          console.error(
-            "[cms-proxy] JSON parse error",
-            url,
-            text.slice(0, 200)
-          );
+        } catch {
+          lastErr = new Error(`Invalid JSON from ${u}`);
+          console.error("[cms-proxy] parse error:", u);
           continue;
         }
-
         rows = (Array.isArray(json) ? json : json.items || []).map(pickFields);
         break;
       } catch (e) {
         lastErr = e;
-        console.error("[cms-proxy] fetch failed", e?.message || e, "URL:", url);
+        console.error("[cms-proxy] fetch failed:", e?.message || e, "url:", u);
         continue;
       }
     }
@@ -158,7 +156,7 @@ exports.handler = async (event) => {
     if (!rows) {
       return {
         statusCode: 502,
-        headers: { ...CORS, "Content-Type": "application/json" },
+        headers: CORS, // CORS even on error
         body: JSON.stringify({
           error: "Upstream fetch failed",
           detail: String(lastErr || "unknown"),
@@ -170,11 +168,12 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { ...CORS, "Content-Type": "application/json" },
+      headers: CORS, // ✅ CORS on success
       body: JSON.stringify(filtered),
     };
   } catch (err) {
-    console.error("[cms-proxy] handler error", err);
+    console.error("[cms-proxy] handler error:", err);
+    // ✅ CORS even on unexpected crashes
     return {
       statusCode: 500,
       headers: CORS,
