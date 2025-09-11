@@ -1,9 +1,16 @@
-export const CMS_PROXY_BASE = import.meta.env.VITE_CMS_PROXY_BASE || "";
+// src/constants/CONFIG.js
+export const CMS_PROXY_BASE =
+  (import.meta.env.VITE_CMS_PROXY_BASE &&
+    import.meta.env.VITE_CMS_PROXY_BASE.trim()) ||
+  (import.meta.env.PROD
+    ? "/.netlify/functions/cms-proxy" // same-origin in prod
+    : "https://rate-my-hospital.netlify.app/.netlify/functions/cms-proxy"); // OK in dev
+
 export const DATASETS = { HOSPITALS: "xubh-q36u", HCAHPS: "dgck-syfz" };
 export const PAGE_LIMIT = 24;
 
-export const USE_PROXY = (import.meta.env.VITE_USE_PROXY || "true") === "true";
-export const USE_MOCKS = (import.meta.env.VITE_USE_MOCKS || "false") === "true";
+export const USE_PROXY = (import.meta.env.VITE_USE_PROXY ?? "true") === "true";
+export const USE_MOCKS = (import.meta.env.VITE_USE_MOCKS ?? "false") === "true";
 
 console.log(
   "[CMS CONFIG] proxy base:",

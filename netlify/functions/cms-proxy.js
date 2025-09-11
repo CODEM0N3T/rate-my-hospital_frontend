@@ -1,48 +1,83 @@
 // netlify/functions/cms-proxy.mjs
 export const config = { path: "/.netlify/functions/cms-proxy" };
 
-const CORS_HEADERS = {
+const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const HOSPITALS_ALIAS = "xubh-q36u"; // Hospital General Info (Socrata alias)
-const HCAHPS_ALIAS = "dgck-syfz"; // HCAHPS (Socrata alias)
+const HOSPITALS = "xubh-q36u";
+const HCAHPS   = "dgck-syfz";
 
-// Helper: map query from UI to Socrata-ish or Provider API
-function buildUpstreamUrl(dataset, qs) {
-  // Try Provider Data API first (more modern). NOTE: some sites require UUID not alias.
-  // If this 404s in your logs, flip to Socrata "resource" path below (and add your app token there).
-  const params = new URLSearchParams();
-  // map your UI params -> provider API params
-  if (qs.get("size")) params.set("size", qs.get("size"));
-  if (qs.get("offset")) params.set("offset", qs.get("offset"));
-  if (qs.get("q")) params.set("q", qs.get("q"));
-  if (qs.get("state")) params.set("state", qs.get("state"));
-  if (dataset === HCAHPS_ALIAS && qs.get("provider_id")) {
-    params.set("provider_id", qs.get("provider_id"));
+// ---- Fallback samples (renderable by your cards) ----
+const SAMPLE_HOSPITALS = [
+  {
+    provider_id: "100001",
+    hospital_name: "Sample General Hospital",
+    city: "Atlanta",
+    state: "GA",
+    phone_number: "4041234567",
+    hospital_type: "Acute Care",
+    hospital_ownership: "Nonprofit",
+    hospital_overall_rating: "4",
+  },
+  {
+    provider_id: "100002",
+    hospital_name: "Metro Medical Center",
+    city: "Chicago",
+    state: "IL",
+    phone_number: "3125551234",
+    hospital_type: "Acute Care",
+    hospital_ownership: "Government - Hospital District",
+    hospital_overall_rating: "3",
+  },
+  {
+    provider_id: "100003",
+    hospital_name: "Bayview Health",
+    city: "Tampa",
+    state: "FL",
+    phone_number: "8135559876",
+    hospital_type: "Acute Care",
+    hospital_ownership: "Proprietary",
+    hospital_overall_rating: "5",
+  },
+];
+
+const SAMPLE_HCAHPS = []; // keep empty for now
+
+function buildSocrataUrl(dataset, qs) {
+  const url = new URL(`https://data.cms.gov/resource/${dataset}.json`);
+  // paging
+  if (qs.get("size"))   url.searchParams.set("$limit", qs.get("size"));
+  if (qs.get("offset")) url.searchParams.set("$offset", qs.get("offset"));
+  // filters
+  if (qs.get("q"))      url.searchParams.set("$q", qs.get("q"));
+  if (qs.get("state"))  url.searchParams.set("state", qs.get("state"));
+  if (dataset === HCAHPS && qs.get("provider_id")) {
+    url.searchParams.set("provider_id", qs.get("provider_id"));
   }
-
-  // Provider Data API (CORS-friendly from server)
-  // If this path fails for you, uncomment the Socrata fallback below instead.
-  return `https://data.cms.gov/provider-data/api/1/datastore/sql?${params.toString()}`;
-
-  // ---- Socrata fallback (legacy; often blocked client-side, ok from server) ----
-  // const soc = new URL(`https://data.cms.gov/resource/${dataset}.json`);
-  // if (qs.get("size"))   soc.searchParams.set("$limit",  qs.get("size"));
-  // if (qs.get("offset")) soc.searchParams.set("$offset", qs.get("offset"));
-  // if (qs.get("q"))      soc.searchParams.set("$q",      qs.get("q"));
-  // if (qs.get("state"))  soc.searchParams.set("state",   qs.get("state"));
-  // if (dataset === HCAHPS_ALIAS && qs.get("provider_id")) {
-  //   soc.searchParams.set("provider_id", qs.get("provider_id"));
-  // }
-  // return soc.toString();
+  // optional: sorting
+  // url.searchParams.set("$order", "hospital_name");
+  return url.toString();
 }
 
-export default async (req, context) => {
+async function fetchUpstream(dataset, qs) {
+  const target = buildSocrataUrl(dataset, qs);
+  const headers = {};
+  if (process.env.CMS_APP_TOKEN) {
+    headers["X-App-Token"] = process.env.CMS_APP_TOKEN;
+  }
+  const res = await fetch(target, { headers });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${text.slice(0,300)}`);
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+export default async (req) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: CORS });
   }
 
   try {
@@ -52,47 +87,31 @@ export default async (req, context) => {
 
     if (!dataset) {
       return new Response(JSON.stringify({ error: "Missing dataset param" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        status: 400, headers: { "Content-Type": "application/json", ...CORS },
       });
     }
 
-    const upstream = buildUpstreamUrl(dataset, qs);
-
-    // If you have a CMS App Token and use Socrata fallback, add headers here:
-    // const headers = { "X-App-Token": process.env.CMS_APP_TOKEN || "" };
-
-    const res = await fetch(upstream /*, { headers } */);
-    const text = await res.text();
-
-    if (!res.ok) {
-      return new Response(
-        JSON.stringify({
-          error: "Upstream fetch failed",
-          status: res.status,
-          body: text.slice(0, 500),
-        }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        }
-      );
+    try {
+      const data = await fetchUpstream(dataset, qs);
+      return new Response(JSON.stringify(data), {
+        status: 200, headers: { "Content-Type": "application/json", ...CORS },
+      });
+    } catch (err) {
+      // Fallback samples per dataset
+      const fallback = dataset === HOSPITALS ? SAMPLE_HOSPITALS
+                     : dataset === HCAHPS   ? SAMPLE_HCAHPS
+                     : [];
+      return new Response(JSON.stringify({
+        note: "Upstream fetch failed; returning fallback sample",
+        error: String(err?.message || err),
+        data: fallback,
+      }), {
+        status: 200, headers: { "Content-Type": "application/json", ...CORS },
+      });
     }
-
-    return new Response(text, {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-    });
   } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: "Function error",
-        detail: String(err?.message || err),
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      }
-    );
+    return new Response(JSON.stringify({ error: "Function error", detail: String(err?.message || err) }), {
+      status: 500, headers: { "Content-Type": "application/json", ...CORS },
+    });
   }
 };

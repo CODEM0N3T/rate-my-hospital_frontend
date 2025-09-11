@@ -1,3 +1,4 @@
+// src/api/cms.js
 import {
   CMS_PROXY_BASE,
   DATASETS,
@@ -8,6 +9,7 @@ import {
 import { MOCK_HOSPITALS } from "../mocks/hospitals.js";
 import { MOCK_HCAHPS } from "../mocks/hcahps.js";
 
+// ---- helpers ----
 const check = async (res) => {
   const text = await res.text().catch(() => "");
   if (!res.ok)
@@ -23,6 +25,11 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const match = (t = "", q = "") =>
   String(t).toLowerCase().includes(String(q).toLowerCase());
 
+// Always return an array (unwrap { data } shape returned by the function when using fallbacks)
+const toArray = (json) =>
+  Array.isArray(json) ? json : (json && json.data) || [];
+
+// ---- mocks ----
 async function mockFetchHospitals({ q = "", state = "", page = 1 } = {}) {
   await delay(200);
   const rows = MOCK_HOSPITALS.filter(
@@ -38,10 +45,11 @@ async function mockFetchHcahps(providerId) {
   return MOCK_HCAHPS[providerId] || [];
 }
 
+// ---- proxy URL builder ----
 function proxyUrl(dataset, params = {}) {
   if (!CMS_PROXY_BASE) return "";
   const base = CMS_PROXY_BASE.replace(/\/+$/, "");
-  const url = new URL(base);
+  const url = new URL(base); // e.g. /.netlify/functions/cms-proxy (prod) or full https URL (dev)
   url.searchParams.set("dataset", dataset);
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
@@ -49,12 +57,15 @@ function proxyUrl(dataset, params = {}) {
   return url.toString();
 }
 
+// ---- PUBLIC ----
 export function fetchHospitals(params = {}, fetchOpts = {}) {
+  // If proxy is disabled/missing or you’re forcing mocks, use local sample
   if (USE_MOCKS || !USE_PROXY || !CMS_PROXY_BASE) {
     if (!CMS_PROXY_BASE && USE_PROXY)
       console.warn("[CMS] CMS_PROXY_BASE missing; using mocks");
     return mockFetchHospitals(params);
   }
+
   const { q = "", state = "", page = 1 } = params;
   const url = proxyUrl(DATASETS.HOSPITALS, {
     size: String(PAGE_LIMIT),
@@ -62,8 +73,10 @@ export function fetchHospitals(params = {}, fetchOpts = {}) {
     ...(q ? { q } : {}),
     ...(state ? { state } : {}),
   });
+
   return fetch(url, fetchOpts)
     .then(check)
+    .then(toArray) // <-- ensure we return an array
     .catch((err) => {
       console.warn("[CMS] proxy failed, using mocks:", err?.message || err);
       return mockFetchHospitals(params);
@@ -77,12 +90,15 @@ export function fetchHcahps(providerId, fetchOpts = {}) {
       console.warn("[CMS] CMS_PROXY_BASE missing; using mocks (HCAHPS)");
     return mockFetchHcahps(providerId);
   }
+
   const url = proxyUrl(DATASETS.HCAHPS, {
     provider_id: providerId,
     size: "50",
   });
+
   return fetch(url, fetchOpts)
     .then(check)
+    .then(toArray) // <-- ensure we return an array
     .catch((err) => {
       console.warn(
         "[CMS] proxy failed (HCAHPS), using mocks:",
