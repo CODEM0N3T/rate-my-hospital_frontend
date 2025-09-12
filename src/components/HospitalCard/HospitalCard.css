@@ -31,7 +31,6 @@
   height: 100%;
 }
 
-/* Fixed, shorter thumbnail for smaller cards */
 .hospital-card__media {
   height: var(--thumb-h);
   background: #f3f4f6;
@@ -47,7 +46,7 @@
 .hospital-card__body {
   padding: var(--pad) calc(var(--pad) + 2px) calc(var(--pad) + 2px);
   display: grid;
-  gap: 6px; /* tighter vertical spacing */
+  gap: 6px;
 }
 
 .hospital-card__title {
@@ -71,7 +70,6 @@
   justify-content: center;
 }
 
-/* smaller chips */
 .chip {
   display: inline-flex;
   align-items: center;

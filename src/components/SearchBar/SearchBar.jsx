@@ -12,7 +12,7 @@ export default function SearchBar({
   onChangeState,
   onSubmit,
   variant = "hero",
-  showState = true, // set false if you want to remove the state selector entirely
+  showState = true,
 }) {
   return (
     <form

@@ -40,7 +40,6 @@
   font-size: 14px;
 }
 
-/* Primary action */
 .search__btn {
   padding: 12px 16px;
   border: 0;
@@ -54,7 +53,6 @@
   filter: brightness(0.95);
 }
 
-/* Hide-only (accessible) labels */
 .sr-only {
   position: absolute;
   left: -10000px;

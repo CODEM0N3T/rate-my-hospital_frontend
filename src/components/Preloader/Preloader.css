@@ -1,19 +1,18 @@
 .preloader {
   display: flex;
   align-items: center;
-  justify-content: center; /* center horizontally */
+  justify-content: center;
   gap: 10px;
   padding: 16px 0;
   width: 100%;
 }
 
-/* Optional: full-screen centered loader */
 .preloader--full {
   position: fixed;
   inset: 0;
   display: grid;
-  place-items: center; /* center both axes */
-  background: transparent; /* change to rgba(255,255,255,.6) for a light veil */
+  place-items: center;
+  background: transparent;
   z-index: 50;
 }
 

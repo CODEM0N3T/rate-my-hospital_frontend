@@ -4,11 +4,10 @@
   margin: 28px 0;
   display: grid;
   gap: 16px;
-  grid-template-columns: 1fr; /* mobile */
+  grid-template-columns: 1fr;
 }
 
 @media (min-width: 1024px) {
-  /* desktop */
   .cards {
     grid-template-columns: repeat(3, 1.6fr);
   }

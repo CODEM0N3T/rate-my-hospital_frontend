@@ -1,4 +1,3 @@
-// src/components/RegisterModal/RegisterModal.jsx
 import { useEffect, useState } from "react";
 import ModalWithForm from "../ModalWithForm/ModalWithForm.jsx";
 import { makeAlias, makeRecoveryCode } from "../../utils/anon.js";

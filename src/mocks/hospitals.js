@@ -1,4 +1,4 @@
-// CMS shape: provider_id, hospital_name, city, state, phone_number, hospital_type, hospital_ownership, hospital_overall_rating
+
 export const MOCK_HOSPITALS = [
   {
     provider_id: "110001",

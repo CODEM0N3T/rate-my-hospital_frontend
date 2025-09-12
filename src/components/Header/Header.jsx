@@ -7,7 +7,6 @@ export default function Header({ loggedIn, onSignIn, onSignUp, onSignOut }) {
   return (
     <header className="header">
       <div className="header__inner container">
-        {/* Clickable logo + title */}
         <Link
           to="/"
           className="header__brand"

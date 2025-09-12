@@ -7,9 +7,9 @@ export default function ModalWithForm({
   onClose,
   onSubmit,
   submitLabel = "Save",
-  // NEW:
+
   secondaryLabel = "Cancel",
-  onSecondary, // falls back to onClose if not provided
+  onSecondary,
 }) {
   const handleSecondary = onSecondary || onClose;
 

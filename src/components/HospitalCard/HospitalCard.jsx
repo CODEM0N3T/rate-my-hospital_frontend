@@ -10,10 +10,9 @@ function phonePretty(s) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : s;
 }
 
-// Simple, reliable placeholder image (works on GH Pages too)
 function getThumb({ providerId, hospitalName }) {
   const seed = encodeURIComponent(providerId || hospitalName || "rmh");
-  return `https://picsum.photos/seed/${seed}/480/270`; // 16:9
+  return `https://picsum.photos/seed/${seed}/480/270`;
 }
 
 export default function HospitalCard({
@@ -31,11 +30,21 @@ export default function HospitalCard({
   return (
     <article className="hospital-card">
       <Link
-  to={`/hospital/${providerId}`}
-  state={{ hospital: { providerId, hospitalName, city, state, phone, type, ownership } }}
-  className="hospital-card__link"
-  aria-label={`Open ${hospitalName}`}
->
+        to={`/hospital/${providerId}`}
+        state={{
+          hospital: {
+            providerId,
+            hospitalName,
+            city,
+            state,
+            phone,
+            type,
+            ownership,
+          },
+        }}
+        className="hospital-card__link"
+        aria-label={`Open ${hospitalName}`}
+      >
         <div className="hospital-card__media">
           <img src={img} alt="" loading="lazy" />
         </div>

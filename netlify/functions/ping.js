@@ -1,11 +1,7 @@
-// netlify/functions/ping.js
-exports.handler = async () => {
+export async function handler() {
   return {
     statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ ok: true, node: process.version }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ok: true, t: Date.now() }),
   };
-};
+}

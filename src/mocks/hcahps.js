@@ -1,4 +1,3 @@
-// keyed by provider_id
 export const MOCK_HCAHPS = {
   110001: [
     {

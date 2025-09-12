@@ -32,15 +32,15 @@
 }
 
 .modal__panel .field {
-  width: var(--field-width, 420px); /* change 420px to whatever you want */
+  width: var(--field-width, 420px);
   max-width: 100%;
   display: block;
 }
 
 .modal__panel .field .form__label {
   display: block;
-  margin-bottom: 6px; /* space between label and input */
-  color: var(--brand); /* same blue as your primary button */
+  margin-bottom: 6px;
+  color: var(--brand);
   font-weight: 600;
 }
 
@@ -71,7 +71,6 @@
   box-shadow: 0 2px 0 -1px var(--brand);
 }
 
-/* Optional states */
 .modal__panel .input:invalid {
   border-bottom-color: #b91c1c;
 }
@@ -89,7 +88,7 @@
 .modal__panel .field .password-toggle {
   position: absolute;
   right: 0;
-  bottom: 10px; /* just above the line */
+  bottom: 10px;
   border: 0;
   background: none;
   color: var(--muted);
@@ -100,7 +99,6 @@
   color: #111;
 }
 
-/* Make the role chip row match the same width */
 .modal__panel .form__row.field {
   width: var(--field-width, 420px);
   text-align: left;

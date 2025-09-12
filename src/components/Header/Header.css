@@ -42,13 +42,11 @@
   opacity: 0.9;
 }
 
-/* Keyboard focus ring for accessibility */
 .header__brand:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
-/* Prevent visited link color changes */
 .header__brand:visited {
   color: inherit;
 }
