@@ -1,117 +1,117 @@
 // netlify/functions/cms-proxy.mjs
-export const config = { path: "/.netlify/functions/cms-proxy" };
+// Node 18 ESM function. Adds CORS and proxies to CMS. Falls back to samples on errors.
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+const DATASETS = {
+  HOSPITALS: "xubh-q36u",
+  HCAHPS: "dgck-syfz",
 };
 
-const HOSPITALS = "xubh-q36u";
-const HCAHPS   = "dgck-syfz";
+// ——— tiny sample fallback to prove end-to-end ———
+const SAMPLE = {
+  xubh-q36u: [
+    {
+      provider_id: "123456",
+      hospital_name: "Sample Medical Center",
+      city: "Springfield",
+      state: "IL",
+      phone_number: "555-123-4567",
+      hospital_type: "Acute Care Hospitals",
+      hospital_ownership: "Voluntary non-profit",
+      hospital_overall_rating: "4",
+    },
+  ],
+  dgck-syfz: [
+    {
+      provider_id: "123456",
+      hcahps_measure_id: "H_COMP_1_A_P",
+      measure_name: "Nurses always communicated well",
+      hcahps_star_rating: "4",
+    },
+  ],
+};
+// ————————————————————————————————————————————————
 
-// ---- Fallback samples (renderable by your cards) ----
-const SAMPLE_HOSPITALS = [
-  {
-    provider_id: "100001",
-    hospital_name: "Sample General Hospital",
-    city: "Atlanta",
-    state: "GA",
-    phone_number: "4041234567",
-    hospital_type: "Acute Care",
-    hospital_ownership: "Nonprofit",
-    hospital_overall_rating: "4",
-  },
-  {
-    provider_id: "100002",
-    hospital_name: "Metro Medical Center",
-    city: "Chicago",
-    state: "IL",
-    phone_number: "3125551234",
-    hospital_type: "Acute Care",
-    hospital_ownership: "Government - Hospital District",
-    hospital_overall_rating: "3",
-  },
-  {
-    provider_id: "100003",
-    hospital_name: "Bayview Health",
-    city: "Tampa",
-    state: "FL",
-    phone_number: "8135559876",
-    hospital_type: "Acute Care",
-    hospital_ownership: "Proprietary",
-    hospital_overall_rating: "5",
-  },
-];
-
-const SAMPLE_HCAHPS = []; // keep empty for now
-
-function buildSocrataUrl(dataset, qs) {
-  const url = new URL(`https://data.cms.gov/resource/${dataset}.json`);
-  // paging
-  if (qs.get("size"))   url.searchParams.set("$limit", qs.get("size"));
-  if (qs.get("offset")) url.searchParams.set("$offset", qs.get("offset"));
-  // filters
-  if (qs.get("q"))      url.searchParams.set("$q", qs.get("q"));
-  if (qs.get("state"))  url.searchParams.set("state", qs.get("state"));
-  if (dataset === HCAHPS && qs.get("provider_id")) {
-    url.searchParams.set("provider_id", qs.get("provider_id"));
-  }
-  // optional: sorting
-  // url.searchParams.set("$order", "hospital_name");
-  return url.toString();
+function corsHeaders(origin) {
+  // Allow both local dev and any Netlify preview/production
+  const allowOrigin =
+    origin ||
+    "*"; // You can tighten this later to your exact domains if you prefer.
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-App-Token",
+  };
 }
 
-async function fetchUpstream(dataset, qs) {
-  const target = buildSocrataUrl(dataset, qs);
-  const headers = {};
-  if (process.env.CMS_APP_TOKEN) {
-    headers["X-App-Token"] = process.env.CMS_APP_TOKEN;
-  }
-  const res = await fetch(target, { headers });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${text.slice(0,300)}`);
-  try { return JSON.parse(text); } catch { return text; }
-}
+export async function handler(event) {
+  const origin = event.headers?.origin || "*";
 
-export default async (req) => {
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS });
+  // Preflight
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: corsHeaders(origin) };
   }
 
   try {
-    const url = new URL(req.url);
-    const qs = url.searchParams;
-    const dataset = qs.get("dataset");
-
+    const qs = event.queryStringParameters || {};
+    const dataset = qs.dataset;
     if (!dataset) {
-      return new Response(JSON.stringify({ error: "Missing dataset param" }), {
-        status: 400, headers: { "Content-Type": "application/json", ...CORS },
-      });
+      return {
+        statusCode: 400,
+        headers: corsHeaders(origin),
+        body: JSON.stringify({ error: "Missing ?dataset=" }),
+      };
     }
 
-    try {
-      const data = await fetchUpstream(dataset, qs);
-      return new Response(JSON.stringify(data), {
-        status: 200, headers: { "Content-Type": "application/json", ...CORS },
-      });
-    } catch (err) {
-      // Fallback samples per dataset
-      const fallback = dataset === HOSPITALS ? SAMPLE_HOSPITALS
-                     : dataset === HCAHPS   ? SAMPLE_HCAHPS
-                     : [];
-      return new Response(JSON.stringify({
-        note: "Upstream fetch failed; returning fallback sample",
-        error: String(err?.message || err),
-        data: fallback,
-      }), {
-        status: 200, headers: { "Content-Type": "application/json", ...CORS },
-      });
-    }
-  } catch (err) {
-    return new Response(JSON.stringify({ error: "Function error", detail: String(err?.message || err) }), {
-      status: 500, headers: { "Content-Type": "application/json", ...CORS },
+    // Map our friendly params to the CMS Data API v1 params
+    const size = qs.size || "24";
+    const offset = qs.offset || "0";
+
+    // IMPORTANT: Use Data API v1 for CMS (not the old SODA endpoint)
+    // Docs pattern: https://data.cms.gov/data-api/v1/dataset/{uuid}/data
+    const api = new URL(
+      `https://data.cms.gov/data-api/v1/dataset/${dataset}/data`
+    );
+    api.searchParams.set("size", size);
+    api.searchParams.set("offset", offset);
+
+    // Optional filters (we’ll keep this simple)
+    if (qs.state) api.searchParams.set("state", qs.state);
+    if (qs.q) api.searchParams.set("q", qs.q);
+
+    // Try upstream
+    const res = await fetch(api.toString(), {
+      // If you have a valid CMS app token, you can add it here:
+      // headers: { "X-App-Token": process.env.CMS_APP_TOKEN }
     });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      // Fall back to samples so your UI still works
+      return {
+        statusCode: 200,
+        headers: corsHeaders(origin),
+        body: JSON.stringify({
+          note: `FALLBACK (upstream ${res.status}): ${text.slice(0, 160)}`,
+          data: SAMPLE[dataset] || [],
+        }),
+      };
+    }
+
+    const data = await res.json();
+    return {
+      statusCode: 200,
+      headers: corsHeaders(origin),
+      body: JSON.stringify(data),
+    };
+  } catch (err) {
+    // Network/DNS/etc. Fall back to samples
+    return {
+      statusCode: 200,
+      headers: corsHeaders(origin),
+      body: JSON.stringify({
+        note: `FALLBACK (error): ${String(err).slice(0, 160)}`,
+        data: SAMPLE[event.queryStringParameters?.dataset] || [],
+      }),
+    };
   }
-};
+}

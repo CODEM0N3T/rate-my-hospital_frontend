@@ -49,7 +49,7 @@ async function mockFetchHcahps(providerId) {
 function proxyUrl(dataset, params = {}) {
   if (!CMS_PROXY_BASE) return "";
   const base = CMS_PROXY_BASE.replace(/\/+$/, "");
-  const url = new URL(base); // e.g. /.netlify/functions/cms-proxy (prod) or full https URL (dev)
+  const url = new URL(base);
   url.searchParams.set("dataset", dataset);
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
