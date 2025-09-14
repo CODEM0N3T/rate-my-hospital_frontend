@@ -1,13 +1,16 @@
 // src/utils/ThirdPartyApi.js
-const CMS_RESOURCE_BASE = "https://data.cms.gov/resource";
+const CMS_RESOURCE_BASE = "https://data.medicare.gov/resource"; // <-- Socrata host
 const DATASETS = {
   HOSPITALS: "xubh-q36u",
   HCAHPS: "dgck-syfz",
 };
 
-const APP_TOKEN = import.meta.env.VITE_CMS_APP_TOKEN || "";
+// Use whichever env you have set
+const APP_TOKEN =
+  import.meta.env.VITE_SOCRATA_APP_TOKEN ||
+  import.meta.env.VITE_CMS_APP_TOKEN ||
+  "";
 
-// Helper: add token if present
 function headers() {
   const h = {};
   if (APP_TOKEN) h["X-App-Token"] = APP_TOKEN;
@@ -20,9 +23,9 @@ async function check(res) {
   throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
 }
 
-// Search hospitals
+// Search hospitals (client-side direct)
 export async function searchHospitals(
-  { q = "", state = "", limit = 12, offset = 0 } = {},
+  { q = "", state = "", limit = 24, offset = 0 } = {},
   fetchOpts = {}
 ) {
   const url = new URL(`${CMS_RESOURCE_BASE}/${DATASETS.HOSPITALS}.json`);
@@ -32,21 +35,19 @@ export async function searchHospitals(
   );
   url.searchParams.set("$limit", String(limit));
   url.searchParams.set("$offset", String(offset));
-
-  // Keep queries light when unauthenticated (avoid $order to prevent 403s)
+  if (q) url.searchParams.set("$q", q);
+  if (state) url.searchParams.set("state", state);
+  // Optional: ordering when token present
   if (APP_TOKEN) url.searchParams.set("$order", "hospital_name");
-
-  if (q) url.searchParams.set("$q", q); // text search
-  if (state) url.searchParams.set("state", state); // exact two-letter state code
 
   const res = await fetch(url.toString(), {
     headers: headers(),
     signal: fetchOpts.signal,
   });
-  return check(res); // returns an array
+  return check(res); // array
 }
 
-// HCAHPS for a provider
+// HCAHPS rows for one provider (client-side direct)
 export async function getHcahps(providerId, fetchOpts = {}) {
   if (!providerId) return [];
   const url = new URL(`${CMS_RESOURCE_BASE}/${DATASETS.HCAHPS}.json`);
