@@ -1,5 +1,4 @@
 // netlify/functions/cms-proxy.js (ESM, Node 18+)
-
 import dns from "node:dns";
 dns.setDefaultResultOrder?.("ipv4first");
 
@@ -37,7 +36,6 @@ function corsHeaders(origin) {
   };
 }
 
-// tiny fetch with timeout
 async function fetchWithTimeout(url, { headers, ms = 20000 } = {}) {
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
@@ -65,33 +63,27 @@ export async function handler(event) {
       };
     }
 
-    // Build upstream URL for Socrata (data.medicare.gov) when using 4x4 IDs
     let upstreamUrl = "";
     let headers = {};
+
     if (SOCRATA_4X4.test(dataset)) {
+      // Socrata (data.medicare.gov)
       const base = `https://data.medicare.gov/resource/${dataset}.json`;
       const p = new URLSearchParams();
-
-      // map size/offset -> $limit/$offset
       const size = Number(qs.size ?? 24);
       const offset = Number(qs.offset ?? 0);
       if (!Number.isNaN(size)) p.set("$limit", String(size));
       if (!Number.isNaN(offset)) p.set("$offset", String(offset));
-
-      // full-text search
       if (qs.q) p.set("$q", qs.q);
-
-      // simple state filter if provided
       if (qs.state) p.set("state", String(qs.state));
-
       upstreamUrl = `${base}?${p.toString()}`;
 
-      // Optional: Socrata app token (set in Netlify env as SOCRATA_APP_TOKEN)
-      if (process.env.SOCRATA_APP_TOKEN) {
+      if (process.env.SOCRATA_APP_TOKEN)
         headers["X-App-Token"] = process.env.SOCRATA_APP_TOKEN;
-      }
+      // Some corp networks require a UA
+      headers["User-Agent"] = headers["User-Agent"] || "rmh-netlify-proxy/1.0";
     } else if (/^[0-9a-f-]{36}$/i.test(dataset)) {
-      // UUID path (data.cms.gov)
+      // UUID (data.cms.gov)
       const base = `https://data.cms.gov/data-api/v1/dataset/${dataset}/data`;
       const p = new URLSearchParams();
       if (qs.size) p.set("size", String(qs.size));
@@ -100,12 +92,11 @@ export async function handler(event) {
       if (qs.state) p.set("filter[state]", String(qs.state));
       upstreamUrl = `${base}?${p.toString()}`;
     } else {
-      // Unknown key type
       return {
         statusCode: 200,
         headers: corsHeaders(origin),
         body: JSON.stringify({
-          note: "FALLBACK (unsupported dataset key format)",
+          note: "FALLBACK (unsupported dataset key)",
           data: SAMPLE[dataset] || [],
         }),
       };
@@ -133,12 +124,14 @@ export async function handler(event) {
       body: JSON.stringify(data),
     };
   } catch (err) {
+    // Return useful diagnostics
     return {
       statusCode: 200,
       headers: corsHeaders(origin),
       body: JSON.stringify({
         note: "FALLBACK (error)",
         error: String(err),
+        code: err?.cause?.code || null, // e.g., ENOTFOUND, ECONNRESET
         data: SAMPLE[event.queryStringParameters?.dataset] || [],
       }),
     };
