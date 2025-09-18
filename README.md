@@ -5,7 +5,7 @@ Frontend (Vite/React) + Cloudflare Worker proxy for CMS data and photos.
 
 ## 🔗 Live App
 
-- **Frontend:** http://localhost:3003/
+- **Frontend:** https://deploy-preview-1--rate-my-hospital.netlify.app/ or http://localhost:3003/
 - **API/Proxy:** https://rmh-proxy.rate-my-hospital.workers.dev
 
 
