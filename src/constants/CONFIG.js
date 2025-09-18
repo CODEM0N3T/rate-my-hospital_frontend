@@ -2,8 +2,7 @@
 export const USE_MOCKS = String(import.meta.env.VITE_USE_MOCKS) === "true";
 export const USE_PROXY = true;
 
-const isDev = import.meta.env.DEV;
-export const CMS_PROXY_BASE = isDev
+export const CMS_PROXY_BASE = import.meta.env.DEV
   ? import.meta.env.VITE_CMS_PROXY_BASE || "/.netlify/functions/cms-proxy"
   : "/.netlify/functions/cms-proxy";
 

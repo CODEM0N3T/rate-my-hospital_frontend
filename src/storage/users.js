@@ -12,7 +12,7 @@ export function aliasExists(alias) {
 
 export function upsertUser(user) {
   const all = loadAll();
-  all[keyOf(user.alias)] = user; // store by lowercased alias
+  all[keyOf(user.alias)] = user;
   saveAll(all);
 }
 

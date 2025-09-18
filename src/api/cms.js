@@ -17,7 +17,7 @@ const check = async (res) => {
   try {
     return JSON.parse(text);
   } catch {
-    return text; // tolerate plain text
+    return text;
   }
 };
 
@@ -57,12 +57,12 @@ function proxyUrl(dataset, params = {}) {
   return `${base}?${qs}`;
 }
 
-// ---------- Public API ----------
+//Public API
 
 export function fetchHospitals(params = {}, fetchOpts = {}) {
   const { q = "", state = "", page = 1 } = params;
 
-  // Go straight to mocks if proxy disabled
+  //mocks if proxy disabled
   if (USE_MOCKS || !USE_PROXY || !CMS_PROXY_BASE) {
     if (!CMS_PROXY_BASE && USE_PROXY)
       console.warn("[CMS] CMS_PROXY_BASE missing; using mocks");
@@ -81,7 +81,7 @@ export function fetchHospitals(params = {}, fetchOpts = {}) {
     .then(toArray)
     .catch(async (err) => {
       if (isAbort(err)) {
-        // navigation/unmount — don't spam logs, just return empty page
+       
         return [];
       }
       console.warn("[CMS] proxy failed, trying direct:", err?.message || err);

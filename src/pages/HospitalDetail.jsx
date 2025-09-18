@@ -7,9 +7,13 @@ import ReviewList from "../components/ReviewList/ReviewList.jsx";
 import ReviewForm from "../components/ReviewForm/ReviewForm.jsx";
 import "./HospitalDetail.css";
 
+const PROXY_ORIGIN =
+  import.meta.env.VITE_PROXY_ORIGIN ??
+  "https://rmh-proxy.rate-my-hospital.workers.dev";
+
 function computeStats(reviews = []) {
   const total = reviews.length || 0;
-  const counts = [0, 0, 0, 0, 0, 0]; // index by stars 0..5
+  const counts = [0, 0, 0, 0, 0, 0]; 
   let recommendYes = 0;
   let difficultySum = 0;
 
@@ -48,7 +52,7 @@ export default function HospitalDetail() {
       .then(setMetrics)
       .catch((e) => {
         console.warn("[HCAHPS] falling back:", e);
-        setMetrics([]); // already your fallback
+        setMetrics([]); 
       });
   }, [providerId]);
 
@@ -71,10 +75,21 @@ export default function HospitalDetail() {
     [stats]
   );
 
+  const heroImg =
+    hospital.photoUrl ||
+    (providerId
+      ? `${PROXY_ORIGIN}/hospital-photo?provider_id=${providerId}&w=960&h=540`
+      : null);
+
   return (
     <article className="detail container">
       <header className="detail__header">
-        {/* LEFT: title + KPIs + actions */}
+        
+        {heroImg && (
+          <div className="detail__hero">
+            <img src={heroImg} alt={hospital.hospitalName || "Hospital"} />
+          </div>
+        )}
         <div className="detail__left">
           <div className="detail__score">
             <div className="detail__score-big">
@@ -128,7 +143,7 @@ export default function HospitalDetail() {
             )}
           </div>
 
-          {/* Optional: quick HCAHPS highlights */}
+        
           {metrics?.length > 0 && (
             <div className="detail__hcahps">
               <h3 className="card__title">HCAHPS Highlights</h3>
@@ -153,7 +168,7 @@ export default function HospitalDetail() {
           )}
         </div>
 
-        {/* RIGHT: rating distribution */}
+     
         <aside className="detail__right">
           <div className="card">
             <h3 className="card__title">Rating Distribution</h3>
@@ -180,7 +195,7 @@ export default function HospitalDetail() {
 
       <hr className="detail__divider" aria-hidden="true" />
 
-      {/* REVIEWS */}
+     
       <section className="detail__reviews">
         <div className="detail__reviews-head">
           <h2>Anonymous Reviews</h2>

@@ -1,3 +1,4 @@
+// src/components/HospitalCard/HospitalCard.jsx
 import "./HospitalCard.css";
 import { Link } from "react-router-dom";
 import StarRating from "../StarRating/StarRating.jsx";
@@ -10,7 +11,11 @@ function phonePretty(s) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : s;
 }
 
-function getThumb({ providerId, hospitalName }) {
+const PROXY_ORIGIN =
+  import.meta.env.VITE_PROXY_ORIGIN ??
+  "https://rmh-proxy.rate-my-hospital.workers.dev";
+
+function getFallbackThumb({ providerId, hospitalName }) {
   const seed = encodeURIComponent(providerId || hospitalName || "rmh");
   return `https://picsum.photos/seed/${seed}/480/270`;
 }
@@ -24,8 +29,13 @@ export default function HospitalCard({
   type,
   ownership,
   hcahpsStars = 0,
+  photoUrl, 
 }) {
-  const img = getThumb({ providerId, hospitalName });
+  const src =
+    photoUrl ||
+    (providerId
+      ? `${PROXY_ORIGIN}/hospital-photo?provider_id=${providerId}&w=480&h=270`
+      : getFallbackThumb({ providerId, hospitalName }));
 
   return (
     <article className="hospital-card">
@@ -40,13 +50,26 @@ export default function HospitalCard({
             phone,
             type,
             ownership,
+            photoUrl: src,
           },
         }}
         className="hospital-card__link"
         aria-label={`Open ${hospitalName}`}
       >
         <div className="hospital-card__media">
-          <img src={img} alt="" loading="lazy" />
+          <img
+            src={src}
+            alt={hospitalName}
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.src = getFallbackThumb({
+                providerId,
+                hospitalName,
+              });
+              e.currentTarget.onerror = null;
+            }}
+            style={{ display: "block", width: "100%", height: "auto" }}
+          />
         </div>
 
         <div className="hospital-card__body">

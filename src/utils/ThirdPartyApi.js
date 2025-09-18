@@ -5,7 +5,6 @@ const DATASETS = {
   HCAHPS: "dgck-syfz",
 };
 
-// Use whichever env you have set
 const APP_TOKEN =
   import.meta.env.VITE_SOCRATA_APP_TOKEN ||
   import.meta.env.VITE_CMS_APP_TOKEN ||
@@ -23,7 +22,7 @@ async function check(res) {
   throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
 }
 
-// Search hospitals (client-side direct)
+// Search hospitals
 export async function searchHospitals(
   { q = "", state = "", limit = 24, offset = 0 } = {},
   fetchOpts = {}
@@ -37,17 +36,17 @@ export async function searchHospitals(
   url.searchParams.set("$offset", String(offset));
   if (q) url.searchParams.set("$q", q);
   if (state) url.searchParams.set("state", state);
-  // Optional: ordering when token present
+
   if (APP_TOKEN) url.searchParams.set("$order", "hospital_name");
 
   const res = await fetch(url.toString(), {
     headers: headers(),
     signal: fetchOpts.signal,
   });
-  return check(res); // array
+  return check(res);
 }
 
-// HCAHPS rows for one provider (client-side direct)
+// HCAHPS rows for one provider
 export async function getHcahps(providerId, fetchOpts = {}) {
   if (!providerId) return [];
   const url = new URL(`${CMS_RESOURCE_BASE}/${DATASETS.HCAHPS}.json`);

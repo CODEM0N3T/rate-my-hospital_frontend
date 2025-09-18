@@ -23,7 +23,6 @@ export default function Home() {
     setLoading(true);
     setError("");
 
-    // always fetch the first “page”; we only show top 3
     fetchHospitals({ q, state: stateCode, page: 1 }, { signal: ctrl.signal })
       .then((data) => {
         const rows = data?.items || data || [];
@@ -42,7 +41,7 @@ export default function Home() {
           ownership: row.hospital_ownership || row.ownership,
           hcahpsStars: row.hospital_overall_rating || row.overall_rating || 0,
         }));
-        setItems(list.slice(0, VISIBLE_LIMIT)); // show only 3
+        setItems(list.slice(0, VISIBLE_LIMIT));
       })
       .catch((e) => {
         if (e?.name !== "AbortError")
@@ -52,8 +51,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    load(); // initial fetch
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load();
   }, []);
 
   function onSubmit(e) {
@@ -71,7 +69,7 @@ export default function Home() {
         <div className="hero__search">
           <SearchBar
             variant="hero"
-            showState={true} // set to false to hide the state dropdown
+            showState={true}
             q={q}
             stateCode={stateCode}
             onChangeQ={setQ}
@@ -86,7 +84,6 @@ export default function Home() {
       {loading && <Preloader />}
       {error && <p role="alert">{error}</p>}
       {!loading && !error && <HospitalList items={items} columns={3} />}
-      {/* Pagination intentionally removed */}
     </section>
   );
 }

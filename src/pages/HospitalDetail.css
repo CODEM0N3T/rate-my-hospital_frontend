@@ -5,9 +5,15 @@
 .detail__header {
   display: grid;
   grid-template-columns: 1fr minmax(320px, 420px);
+
   gap: 24px;
   align-items: start;
   margin-bottom: 28px;
+}
+
+.detail__hero {
+  grid-column: 1;
+  grid-row: 1 / span 2;
 }
 
 .detail__title {
@@ -43,6 +49,12 @@
   text-align: left;
 }
 
+.detail__hero img {
+  width: 80%;
+  height: auto;
+  border-radius: 12px;
+}
+
 .detail__kpis {
   display: grid;
   grid-template-columns: repeat(2, 150px);
@@ -70,8 +82,8 @@
   border: 0;
   height: 1px;
   width: 100%;
-  background: var(--border); /* use your existing border color */
-  margin: 40px 0 30px; /* space above/below the line */
+  background: var(--border);
+  margin: 40px 0 30px;
 }
 
 .detail__actions {
@@ -85,6 +97,15 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
+}
+
+.detail__left {
+  grid-column: 2;
+}
+
+.detail__right {
+  grid-column: 2;
+  margin-top: 10px;
 }
 
 .card {
@@ -163,14 +184,3 @@
   gap: 12px;
   margin-bottom: 8px;
 }
-
-/* @supports (background: linear-gradient(#000, #000)) {
-  .detail__divider {
-    background: linear-gradient(
-      to right,
-      transparent,
-      var(--border),
-      transparent
-    );
-  }
-} */
