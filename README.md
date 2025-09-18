@@ -1,23 +1,28 @@
 # Rate-My-Hospital_Frontend
-Search U.S. hospitals, see CMS HCAHPS metrics, and crowd-rate experiences.
+
+Search U.S. hospitals, see CMS HCAHPS metrics, and crowd-rate experiences.  
 Frontend (Vite/React) + Cloudflare Worker proxy for CMS data and photos.
 
-🔗 Live App
+## 🔗 Live App
 
-Frontend: http://localhost:3003/
-API/Proxy: https://rmh-proxy.rate-my-hospital.workers.dev
+- **Frontend (Production):** http://localhost:3003/
+- **API/Proxy:** https://rmh-proxy.rate-my-hospital.workers.dev
 
-✨ Features
+> For reference during development:
+> - **Local Dev:** http://localhost:3003/
 
-🔎 Hospital search by name/city/state (CMS Hospital General Information).
-⭐ HCAHPS highlights per hospital (patient survey metrics).
-📝 Anonymous user reviews with local stats & distribution.
-🖼️ Photo thumbnails via Google Street View (with safe fallback).
-⚡ API proxy with Socrata-first + CMS Provider Data Catalog (PDC) fallback.
+## ✨ Features
 
-🧱 Tech
+- 🔎 Hospital search by name/city/state (CMS Hospital General Information).
+- ⭐ HCAHPS highlights per hospital (patient survey metrics).
+- 📝 Anonymous user reviews with local stats & distribution.
+- 🖼️ Photo thumbnails via Google Street View (with safe fallback).
+- ⚡ API proxy with Socrata-first + CMS Provider Data Catalog (PDC) CSV fallback.
 
-React (Vite), CSS Grid/Flex
-Cloudflare Workers (Wrangler)
-Data: Socrata (data.medicare.gov), CMS PDC (data.cms.gov)
-Images: Google Street View Static API (with placeholders)
+## 🧱 Tech
+
+- React (Vite), CSS Grid/Flex
+- Cloudflare Workers (Wrangler)
+- Data: Socrata (data.medicare.gov), CMS PDC (data.cms.gov)
+- Images: Google Street View Static API (with placeholders)
+
