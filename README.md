@@ -5,11 +5,10 @@ Frontend (Vite/React) + Cloudflare Worker proxy for CMS data and photos.
 
 ## 🔗 Live App
 
-- **Frontend (Production):** http://localhost:3003/
+- **Frontend:** http://localhost:3003/
 - **API/Proxy:** https://rmh-proxy.rate-my-hospital.workers.dev
 
-> For reference during development:
-> - **Local Dev:** http://localhost:3003/
+
 
 ## ✨ Features
 
