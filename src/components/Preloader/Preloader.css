@@ -1,0 +1,37 @@
+.preloader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 0;
+  width: 100%;
+}
+
+.preloader--full {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  z-index: 50;
+}
+
+.preloader__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: #111;
+  animation: spin 0.7s linear infinite;
+}
+
+.preloader__text {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
