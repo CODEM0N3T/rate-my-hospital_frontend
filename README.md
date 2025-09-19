@@ -25,4 +25,4 @@ Frontend (Vite/React) + Cloudflare Worker proxy for CMS data and photos.
 - Data: Socrata (data.medicare.gov), CMS PDC (data.cms.gov)
 - Images: Google Street View Static API (with placeholders)
 
->>>>>>> 1817fe526eba78e94ff3a0b7b767b41849de79a3
+
