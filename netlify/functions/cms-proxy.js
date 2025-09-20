@@ -1,6 +1,4 @@
 // netlify/functions/cms-proxy.js
-// Socrata-first, then CMS PDC datastore (filters[field]=value),
-// then CMS Data API v1 (filter[field]=value). CORS on every path.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -20,7 +18,7 @@ const text = (body, status = 200) => ({
   body,
 });
 
-// ---------- helpers ----------
+//helpers
 async function fetchJSON(url, headers = {}) {
   const r = await fetch(url.toString(), { headers });
   const txt = await r.text();
@@ -32,9 +30,8 @@ async function fetchJSON(url, headers = {}) {
   }
 }
 
-// CSV parsing that handles quotes and a possible BOM on the first line
 function parseCsvLine(line) {
-  if (line && line.charCodeAt(0) === 0xfeff) line = line.slice(1); // strip BOM
+  if (line && line.charCodeAt(0) === 0xfeff) line = line.slice(1);
   const out = [];
   let cell = "",
     q = false;
@@ -136,7 +133,7 @@ async function streamCsv(
   return out;
 }
 
-// Resolve CSV download URL from CMS Provider Data Catalog (DKAN) metastore
+// Resolve CSV
 async function resolveCsvUrl(datasetId) {
   const metaURL = `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(
     datasetId
@@ -157,7 +154,7 @@ async function resolveCsvUrl(datasetId) {
   return { csvUrl: null };
 }
 
-// Resolve Data API v1 "latest" endpoint from PDC metastore distributions
+// Resolve Data API
 async function resolveApiUrl(datasetId) {
   const metaURL = `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(
     datasetId
@@ -174,7 +171,7 @@ async function resolveApiUrl(datasetId) {
   return { apiUrl: null };
 }
 
-// ---------- header maps ----------
+//header maps
 const HOSP_HEADERS = {
   "Facility ID": "provider_id",
   "Facility Name": "hospital_name",
@@ -205,7 +202,7 @@ const HCAHPS_HEADERS = {
   "Survey Response Rate Percent": "survey_response_rate_percent",
 };
 
-// ---------- Socrata (primary) ----------
+//Socrata
 const SOC_HOST = "https://data.medicare.gov";
 
 async function socrataHospitals(
@@ -234,7 +231,7 @@ async function socrataHospitals(
   u.searchParams.set("$offset", String(offset));
   if (q) u.searchParams.set("$q", q);
   if (state) u.searchParams.set("state", state);
-  if (token) u.searchParams.set("$order", "hospital_name"); // nicer order when token present
+  if (token) u.searchParams.set("$order", "hospital_name");
 
   const headers = { Accept: "application/json" };
   if (token) headers["X-App-Token"] = token;
@@ -296,13 +293,13 @@ async function socrataHcahps(
   return fetchJSON(u, headers);
 }
 
-// ---------- PDC fallbacks ----------
+//PDC fallbacks
 
-// HCAHPS via PDC: datastore (filters[field]=value) then Data API v1 (filter[field]=value)
+// HCAHPS via PDC: datastore
 async function pdcHcahps(providerId, { size = 50, offset = 0 } = {}) {
   const tries = [];
 
-  // 1) DKAN datastore
+  //DKAN datastore
   const dsBase =
     "https://data.cms.gov/provider-data/api/1/datastore/query/dgck-syfz/0";
   for (const field of ["facility_id", "provider_id", "ccn"]) {
@@ -320,7 +317,7 @@ async function pdcHcahps(providerId, { size = 50, offset = 0 } = {}) {
     }
   }
 
-  // 2) Data API v1 (latest)
+  //Data API
   try {
     const { apiUrl } = await resolveApiUrl("dgck-syfz");
     if (apiUrl) {
@@ -354,7 +351,7 @@ async function pdcHcahps(providerId, { size = 50, offset = 0 } = {}) {
   return { note: "HCAHPS: no rows via PDC JSON", tries };
 }
 
-// ---------- Handler (Netlify v1) ----------
+// Handler
 exports.handler = async (event) => {
   try {
     // CORS preflight
@@ -382,7 +379,7 @@ exports.handler = async (event) => {
       process.env.VITE_CMS_APP_TOKEN ||
       "";
 
-    // -------- HCAHPS (dgck-syfz) --------
+    // HCAHPS
     if (dataset === "dgck-syfz") {
       const providerId = String(
         qs.provider_id || qs.facility_id || qs.ccn || ""
@@ -428,7 +425,7 @@ exports.handler = async (event) => {
       }
     }
 
-    // -------- Hospitals (xubh-q36u) --------
+    // Hospitals
     if (dataset === "xubh-q36u") {
       const q = String(qs.q || "").trim();
       const state = String(qs.state || "").trim();

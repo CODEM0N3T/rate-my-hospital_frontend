@@ -1,7 +1,7 @@
 // src/constants/CONFIG.js
 export const USE_MOCKS = String(import.meta.env.VITE_USE_MOCKS) === "true";
 export const USE_PROXY = true;
-// Always prefer the env var in all environments; fallback to Netlify function path.
+
 export const CMS_PROXY_BASE =
   import.meta.env.VITE_CMS_PROXY_BASE || "/.netlify/functions/cms-proxy";
 

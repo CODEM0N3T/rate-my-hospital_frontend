@@ -154,7 +154,7 @@ async function resolveCsvUrl(datasetId) {
   return { csvUrl: null };
 }
 
-// Find a Datastore resource UUID for a Provider Data Catalog dataset
+
 async function resolveResourceId(datasetId) {
   const metaURL = `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(
     datasetId
