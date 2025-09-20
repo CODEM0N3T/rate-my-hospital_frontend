@@ -1,13 +1,3 @@
-<<<<<<< HEAD
-# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-=======
 # Rate-My-Hospital_Frontend
 
 Search U.S. hospitals, see CMS HCAHPS metrics, and crowd-rate experiences.  
@@ -35,4 +25,4 @@ Frontend (Vite/React) + Cloudflare Worker proxy for CMS data and photos.
 - Data: Socrata (data.medicare.gov), CMS PDC (data.cms.gov)
 - Images: Google Street View Static API (with placeholders)
 
->>>>>>> 1817fe526eba78e94ff3a0b7b767b41849de79a3
+
