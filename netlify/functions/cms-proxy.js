@@ -1,4 +1,4 @@
-// rmh-proxy/src/index.js (cms-proxy.js)
+// netlify/functions/cms-proxy.js
 // Socrata-first, then CMS PDC datastore (filters[field]=value),
 // then CMS Data API v1 (filter[field]=value). CORS on every path.
 
@@ -8,17 +8,17 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type, X-App-Token",
 };
 
-const json = (obj, status = 200) =>
-  new Response(JSON.stringify(obj), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", ...CORS },
-  });
+const json = (obj, status = 200) => ({
+  statusCode: status,
+  headers: { "content-type": "application/json; charset=utf-8", ...CORS },
+  body: JSON.stringify(obj),
+});
 
-const text = (body, status = 200) =>
-  new Response(body, {
-    status,
-    headers: { "content-type": "text/plain; charset=utf-8", ...CORS },
-  });
+const text = (body, status = 200) => ({
+  statusCode: status,
+  headers: { "content-type": "text/plain; charset=utf-8", ...CORS },
+  body,
+});
 
 // ---------- helpers ----------
 async function fetchJSON(url, headers = {}) {
@@ -36,18 +36,23 @@ async function fetchJSON(url, headers = {}) {
 function parseCsvLine(line) {
   if (line && line.charCodeAt(0) === 0xfeff) line = line.slice(1); // strip BOM
   const out = [];
-  let cell = "", q = false;
+  let cell = "",
+    q = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (q) {
       if (c === '"') {
-        if (line[i + 1] === '"') { cell += '"'; i++; }
-        else q = false;
+        if (line[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else q = false;
       } else cell += c;
     } else {
       if (c === '"') q = true;
-      else if (c === ",") { out.push(cell); cell = ""; }
-      else cell += c;
+      else if (c === ",") {
+        out.push(cell);
+        cell = "";
+      } else cell += c;
     }
   }
   out.push(cell);
@@ -66,7 +71,13 @@ function normalizeRow(headers, row, map = {}) {
 
 async function streamCsv(
   resp,
-  { headerMap = {}, size = 24, offset = 0, filterLine = null, filterRow = null } = {}
+  {
+    headerMap = {},
+    size = 24,
+    offset = 0,
+    filterLine = null,
+    filterRow = null,
+  } = {}
 ) {
   if (!resp.ok || !resp.body) {
     const snippet = (await resp.text().catch(() => "")).slice(0, 240);
@@ -74,7 +85,10 @@ async function streamCsv(
   }
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
-  let buf = "", headers = null, out = [], seen = 0;
+  let buf = "",
+    headers = null,
+    out = [],
+    seen = 0;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -102,7 +116,9 @@ async function streamCsv(
       if (seen++ < offset) continue;
       out.push(obj);
       if (out.length >= size) {
-        try { reader.cancel(); } catch {}
+        try {
+          reader.cancel();
+        } catch {}
         return out;
       }
     }
@@ -122,13 +138,17 @@ async function streamCsv(
 
 // Resolve CSV download URL from CMS Provider Data Catalog (DKAN) metastore
 async function resolveCsvUrl(datasetId) {
-  const metaURL =
-    `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(datasetId)}?show-reference-ids=false`;
+  const metaURL = `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(
+    datasetId
+  )}?show-reference-ids=false`;
   const meta = await fetchJSON(metaURL, { Accept: "application/json" });
   const dists = Array.isArray(meta?.distribution) ? meta.distribution : [];
   for (const d of dists) {
     const candidates = [
-      d?.data?.downloadURL, d?.downloadURL, d?.data?.accessURL, d?.accessURL,
+      d?.data?.downloadURL,
+      d?.downloadURL,
+      d?.data?.accessURL,
+      d?.accessURL,
     ];
     for (const u of candidates)
       if (typeof u === "string" && u.toLowerCase().endsWith(".csv"))
@@ -139,8 +159,9 @@ async function resolveCsvUrl(datasetId) {
 
 // Resolve Data API v1 "latest" endpoint from PDC metastore distributions
 async function resolveApiUrl(datasetId) {
-  const metaURL =
-    `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(datasetId)}?show-reference-ids=false`;
+  const metaURL = `https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/${encodeURIComponent(
+    datasetId
+  )}?show-reference-ids=false`;
   const meta = await fetchJSON(metaURL, { Accept: "application/json" });
   const dists = Array.isArray(meta?.distribution) ? meta.distribution : [];
   for (const d of dists) {
@@ -213,14 +234,13 @@ async function socrataHospitals(
   u.searchParams.set("$offset", String(offset));
   if (q) u.searchParams.set("$q", q);
   if (state) u.searchParams.set("state", state);
-  if (token) u.searchParams.set("$order", "hospital_name"); // skip $order if no token
+  if (token) u.searchParams.set("$order", "hospital_name"); // nicer order when token present
 
   const headers = { Accept: "application/json" };
   if (token) headers["X-App-Token"] = token;
   return fetchJSON(u, headers);
 }
 
-// Return a few provider_ids that have HCAHPS rows (debug helper)
 async function socrataAnyHcahps(token, limit = 5) {
   const u = new URL(`${SOC_HOST}/resource/dgck-syfz.json`);
   u.searchParams.set("$select", "provider_id");
@@ -233,7 +253,11 @@ async function socrataAnyHcahps(token, limit = 5) {
 }
 
 // Socrata HCAHPS: tolerant matching
-async function socrataHcahps(providerId, { size = 50, offset = 0 } = {}, token) {
+async function socrataHcahps(
+  providerId,
+  { size = 50, offset = 0 } = {},
+  token
+) {
   const u = new URL(`${SOC_HOST}/resource/dgck-syfz.json`);
   const id = providerId.trim();
   const n = parseInt(id, 10);
@@ -330,133 +354,139 @@ async function pdcHcahps(providerId, { size = 50, offset = 0 } = {}) {
   return { note: "HCAHPS: no rows via PDC JSON", tries };
 }
 
-// ---------- Handler ----------
-export default {
-  async fetch(req, env) {
-    try {
-      const url = new URL(req.url);
-      if (req.method === "OPTIONS")
-        return new Response(null, { status: 204, headers: CORS });
-
-      if (url.pathname === "/") return text("rmh-proxy: ok");
-      if (url.pathname === "/ping") return json({ ok: true, t: Date.now() });
-
-      if (url.pathname === "/hcahps-sample") {
-        try {
-          const rows = await socrataAnyHcahps(env.SOCRATA_APP_TOKEN, 5);
-          return json(rows);
-        } catch (e) {
-          return json({ error: "hcahps-sample failed", detail: String(e) }, 502);
-        }
-      }
-
-      if (url.pathname !== "/cms-proxy") return text("Not Found", 404);
-
-      const dataset = (url.searchParams.get("dataset") || "").trim().toLowerCase();
-      const size = parseInt(url.searchParams.get("size") || "24", 10);
-      const offset = parseInt(url.searchParams.get("offset") || "0", 10);
-      if (!dataset) return json({ error: "Missing ?dataset=" }, 400);
-
-      // -------- HCAHPS (dgck-syfz) --------
-      if (dataset === "dgck-syfz") {
-        const providerId = (
-          url.searchParams.get("provider_id") ||
-          url.searchParams.get("facility_id") ||
-          url.searchParams.get("ccn") ||
-          ""
-        ).trim();
-        if (!providerId) {
-          return json({
-            error: "HCAHPS requires one of ?provider_id= | ?facility_id= | ?ccn=",
-          }, 400);
-        }
-
-        // 1) Socrata first (return array even if empty)
-        try {
-          const rows = await socrataHcahps(
-            providerId,
-            { size, offset },
-            env.SOCRATA_APP_TOKEN
-          );
-          if (Array.isArray(rows)) return json(rows);
-        } catch (e) {
-          // Socrata error: try PDC JSON before giving up
-          try {
-            const out = await pdcHcahps(providerId, { size, offset });
-            if (Array.isArray(out)) return json(out);
-            return json({
-              data: [],
-              note: out?.note || "No rows from PDC fallback",
-              tries: out?.tries || [],
-              socrata_error: String(e).slice(0, 300),
-            });
-          } catch (e2) {
-            return json(
-              {
-                data: [],
-                note: "HCAHPS unavailable",
-                socrata_error: String(e).slice(0, 300),
-                err: String(e2).slice(0, 180),
-              },
-              502
-            );
-          }
-        }
-      }
-
-      // -------- Hospitals (xubh-q36u) --------
-      if (dataset === "xubh-q36u") {
-        const q = (url.searchParams.get("q") || "").trim();
-        const state = (url.searchParams.get("state") || "").trim();
-
-        // 1) Socrata first
-        try {
-          const rows = await socrataHospitals(
-            { q, state, size, offset },
-            env.SOCRATA_APP_TOKEN
-          );
-          if (Array.isArray(rows) && rows.length) return json(rows);
-        } catch {
-          /* fall through to CSV */
-        }
-
-        // 2) PDC CSV fallback
-        const { csvUrl } = await resolveCsvUrl("xubh-q36u");
-        if (!csvUrl)
-          return json({ note: "Hospitals: could not resolve CSV URL" }, 502);
-
-        const r = await fetch(csvUrl, { headers: { Accept: "text/csv" } });
-        const rows = await streamCsv(r, {
-          headerMap: HOSP_HEADERS,
-          filterLine: (line) => {
-            if (!q && !state) return true;
-            const L = line.toLowerCase();
-            const okQ = !q || L.includes(q.toLowerCase());
-            const okS =
-              !state || line.toUpperCase().includes(state.toUpperCase());
-            return okQ && okS;
-          },
-          filterRow: (o) => {
-            if (q) {
-              const s = q.toLowerCase();
-              const ok =
-                String(o.hospital_name || "").toLowerCase().includes(s) ||
-                String(o.city || "").toLowerCase().includes(s);
-              if (!ok) return false;
-            }
-            if (state && String(o.state || "").toUpperCase() !== state.toUpperCase())
-              return false;
-            return true;
-          },
-          size,
-          offset,
-        });
-        return json(rows);
-      }
-
-      return json({ error: `Unsupported dataset: ${dataset}` }, 400);
-    } catch (err) {
-      return json({ error: "Unhandled", detail: String(err).slice(0, 400) }, 500);
+// ---------- Handler (Netlify v1) ----------
+exports.handler = async (event) => {
+  try {
+    // CORS preflight
+    if (event.httpMethod === "OPTIONS") {
+      return { statusCode: 204, headers: CORS, body: "" };
     }
-  },
+
+    // Simple ping/debug
+    if ((event.queryStringParameters || {}).ping) {
+      return json({ ok: true, t: Date.now() });
+    }
+
+    const qs = event.queryStringParameters || {};
+    const dataset = String(qs.dataset || "")
+      .trim()
+      .toLowerCase();
+    const size = parseInt(qs.size || "24", 10);
+    const offset = parseInt(qs.offset || "0", 10);
+    if (!dataset) return json({ error: "Missing ?dataset=" }, 400);
+
+    const APP_TOKEN =
+      process.env.SOCRATA_APP_TOKEN ||
+      process.env.VITE_SOCRATA_APP_TOKEN ||
+      process.env.CMS_APP_TOKEN ||
+      process.env.VITE_CMS_APP_TOKEN ||
+      "";
+
+    // -------- HCAHPS (dgck-syfz) --------
+    if (dataset === "dgck-syfz") {
+      const providerId = String(
+        qs.provider_id || qs.facility_id || qs.ccn || ""
+      ).trim();
+      if (!providerId) {
+        return json(
+          {
+            error:
+              "HCAHPS requires one of ?provider_id= | ?facility_id= | ?ccn=",
+          },
+          400
+        );
+      }
+
+      try {
+        const rows = await socrataHcahps(
+          providerId,
+          { size, offset },
+          APP_TOKEN
+        );
+        if (Array.isArray(rows)) return json(rows);
+      } catch (e) {
+        try {
+          const out = await pdcHcahps(providerId, { size, offset });
+          if (Array.isArray(out)) return json(out);
+          return json({
+            data: [],
+            note: out?.note || "No rows from PDC fallback",
+            tries: out?.tries || [],
+            socrata_error: String(e).slice(0, 300),
+          });
+        } catch (e2) {
+          return json(
+            {
+              data: [],
+              note: "HCAHPS unavailable",
+              socrata_error: String(e).slice(0, 300),
+              err: String(e2).slice(0, 180),
+            },
+            502
+          );
+        }
+      }
+    }
+
+    // -------- Hospitals (xubh-q36u) --------
+    if (dataset === "xubh-q36u") {
+      const q = String(qs.q || "").trim();
+      const state = String(qs.state || "").trim();
+
+      // 1) Socrata first
+      try {
+        const rows = await socrataHospitals(
+          { q, state, size, offset },
+          APP_TOKEN
+        );
+        if (Array.isArray(rows) && rows.length) return json(rows);
+      } catch {
+        /* fall through to CSV */
+      }
+
+      // 2) PDC CSV fallback
+      const { csvUrl } = await resolveCsvUrl("xubh-q36u");
+      if (!csvUrl)
+        return json({ note: "Hospitals: could not resolve CSV URL" }, 502);
+
+      const r = await fetch(csvUrl, { headers: { Accept: "text/csv" } });
+      const rows = await streamCsv(r, {
+        headerMap: HOSP_HEADERS,
+        filterLine: (line) => {
+          if (!q && !state) return true;
+          const L = line.toLowerCase();
+          const okQ = !q || L.includes(q.toLowerCase());
+          const okS =
+            !state || line.toUpperCase().includes(state.toUpperCase());
+          return okQ && okS;
+        },
+        filterRow: (o) => {
+          if (q) {
+            const s = q.toLowerCase();
+            const ok =
+              String(o.hospital_name || "")
+                .toLowerCase()
+                .includes(s) ||
+              String(o.city || "")
+                .toLowerCase()
+                .includes(s);
+            if (!ok) return false;
+          }
+          if (
+            state &&
+            String(o.state || "").toUpperCase() !== state.toUpperCase()
+          )
+            return false;
+          return true;
+        },
+        size,
+        offset,
+      });
+      return json(rows);
+    }
+
+    return json({ error: `Unsupported dataset: ${dataset}` }, 400);
+  } catch (err) {
+    return json({ error: "Unhandled", detail: String(err).slice(0, 400) }, 500);
+  }
 };
