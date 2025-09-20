@@ -25,3 +25,8 @@
   port = 3002                     
   functions = "netlify/functions"
   autoLaunch = false
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
