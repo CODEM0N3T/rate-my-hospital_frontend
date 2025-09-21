@@ -1,0 +1,9 @@
+.footer {
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+.footer__inner {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
